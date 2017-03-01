@@ -1,0 +1,32 @@
+{
+  "name": "ethereum-identity",
+  "version": "1.0.0",
+  "description": "Ethereum digital identity project.",
+  "dependencies": {
+    "bip39": "^2.2.0",
+    "ethereumjs-wallet": "^0.6.0",
+    "web3": "^0.18.2",
+    "web3-provider-engine": "^9.1.0"
+  },
+  "devDependencies": {
+    "babel-loader": "^6.3.2",
+    "copy-webpack-plugin": "^4.0.1",
+    "css-loader": "^0.26.2",
+    "extract-text-webpack-plugin": "^2.0.0",
+    "style-loader": "^0.13.2",
+    "truffle-solidity-loader": "0.0.8",
+    "webpack": "^2.2.1",
+    "webpack-dev-server": "^2.4.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zachd/ethereum-identity.git"
+  },
+  "scripts": {
+    "build": "./node_modules/.bin/webpack",
+    "dev": "./node_modules/.bin/webpack-dev-server --hot"
+  },
+  "author": "zachd",
+  "license": "ISC",
+  "private": true
+}

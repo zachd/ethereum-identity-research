@@ -1,14 +1,30 @@
-var accounts;
-var account;
-var contract;
+var Web3 = require("web3");
+require("../stylesheets/app.css");
+var Identity = require("../../contracts/Identity.sol");
 
-function setStatus(message) {
-  var status = document.getElementById("status");
-  status.innerHTML = message;
-};
+// HD/BIP39 Imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
+var bip39 = require("bip39");
+var hdkey = require('ethereumjs-wallet/hdkey');
+
+// Detecting Web3: http://truffleframework.com/tutorials/bundling-with-webpack#detecting-web3
+window.addEventListener('load', function() {
+  // Supports Metamask and Mist, and other wallets that provide 'web3'
+  if (typeof web3 !== 'undefined') {
+    window.web3 = new Web3(web3.currentProvider);
+  } else {
+    window.web3 = new Web3(new Web3.providers.HttpProvider('https://ropsten.infura.io')); 
+  }
+  Identity.setProvider(window.web3.currentProvider);
+});
+
+// Global variables
+var identity;
+var mnemonic;
+var hdwallet;
+var address;
 
 function getIdent() {
-  contract.getIdent.call(account, {from: account}).then(function(resp) {
+  identity.getIdent.call(account, {from: account}).then(function(resp) {
     if(resp[0] > 0){
       show_hide("details", "new");
       document.getElementById("userid").innerHTML = resp[0];
@@ -53,26 +69,24 @@ function getRandomId() {
   return Math.floor(Math.random() * 100) + 1;
 }
 
+function generateAddress() {
+  var wallet_hdpath = "m/44'/60'/0'/0/";
+  mnemonic = bip39.generateMnemonic();
+  hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
+  var wallet = hdwallet.derivePath(wallet_hdpath + "0").getWallet();
+  return "0x" + wallet.getAddress().toString("hex");
+}
 
 window.onload = function() {
-  contract = Identity.deployed();
-  web3.eth.getAccounts(function(err, accounts) {
-    if (err != null) {
-      alert("There was an error fetching your accounts.");
-      return;
-    }
+  identity = Identity.deployed();
+  address = localStorage.getItem('address') || generateAddress();
+  mnemonic = localStorage.getItem('mnemonic') || mnemonic;
 
-    if (accounts.length == 0) {
-      alert("Couldn't get any accounts! Make sure your Ethereum client is configured correctly.");
-      return;
-    }
+  localStorage.setItem('address', address);
+  localStorage.setItem('mnemonic', mnemonic);
 
-    var accountID = getUrlParameter('acc') || localStorage.getItem('account') || getRandomId();
-    account = accounts[accountID];
-    localStorage.setItem('account', accountID);
-    document.getElementById('accountID').innerHTML = accountID;
-    document.getElementById('address').innerHTML = account;
+  document.getElementById('address').innerHTML = address;
+  document.getElementById('mnemonic').innerHTML = mnemonic;
 
-    getIdent();
-  });
+  //getIdent();
 }
