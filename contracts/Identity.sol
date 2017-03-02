@@ -20,7 +20,6 @@ contract Identity {
     }
 
     function newIdent(string name) returns(bool) {
-    	if(idents[msg.sender].id > 0) throw;
         identCount += 1;
         idents[msg.sender] = Ident(identCount, name);
     }

@@ -1,30 +1,25 @@
 var Web3 = require("web3");
 require("../stylesheets/app.css");
+var wallet_hdpath = "m/44'/60'/0'/0/";
 var Identity = require("../../contracts/Identity.sol");
 
 // HD/BIP39 Imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 var bip39 = require("bip39");
 var hdkey = require('ethereumjs-wallet/hdkey');
-
-// Detecting Web3: http://truffleframework.com/tutorials/bundling-with-webpack#detecting-web3
-window.addEventListener('load', function() {
-  // Supports Metamask and Mist, and other wallets that provide 'web3'
-  if (typeof web3 !== 'undefined') {
-    window.web3 = new Web3(web3.currentProvider);
-  } else {
-    window.web3 = new Web3(new Web3.providers.HttpProvider('https://ropsten.infura.io')); 
-  }
-  Identity.setProvider(window.web3.currentProvider);
-});
+var HDWalletProvider = require("truffle-hdwallet-provider");
 
 // Global variables
 var identity;
 var mnemonic;
-var hdwallet;
 var address;
 
+function setStatus(message) {
+  var status = document.getElementById("status");
+  status.innerHTML = message;
+};
+
 function getIdent() {
-  identity.getIdent.call(account, {from: account}).then(function(resp) {
+  identity.getIdent.call(address, {from: address}).then(function(resp) {
     if(resp[0] > 0){
       show_hide("details", "new");
       document.getElementById("userid").innerHTML = resp[0];
@@ -39,10 +34,10 @@ function getIdent() {
   });
 };
 
-function newIdent() {
+window.newIdent = function newIdent() {
   var name = document.getElementById("name").value;
   setStatus("Initiating transaction...");
-  contract.newIdent(name, {from: account}).then(function(value) {
+  identity.newIdent(name, {from: address}).then(function(value) {
     setStatus("Transaction complete!");
     getIdent();
   }).catch(function(e) {
@@ -69,24 +64,37 @@ function getRandomId() {
   return Math.floor(Math.random() * 100) + 1;
 }
 
-function generateAddress() {
-  var wallet_hdpath = "m/44'/60'/0'/0/";
-  mnemonic = bip39.generateMnemonic();
-  hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
-  var wallet = hdwallet.derivePath(wallet_hdpath + "0").getWallet();
-  return "0x" + wallet.getAddress().toString("hex");
+function generateMnemonic() {
+  return bip39.generateMnemonic();
 }
 
-window.onload = function() {
+window.addEventListener('load', function() {
   identity = Identity.deployed();
-  address = localStorage.getItem('address') || generateAddress();
-  mnemonic = localStorage.getItem('mnemonic') || mnemonic;
 
-  localStorage.setItem('address', address);
+  // Generate Wallet
+  mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
+  var hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
+  var wallet = hdwallet.derivePath(wallet_hdpath + "0").getWallet();
+  address = "0x" + wallet.getAddress().toString("hex");
+
+  // Supports Metamask and Mist, and other wallets that provide 'web3'
+  // http://truffleframework.com/tutorials/bundling-with-webpack
+  if (typeof web3 !== 'undefined') {
+    window.web3 = new Web3(web3.currentProvider);
+  } else {
+    var provider = new HDWalletProvider(mnemonic, "http://localhost:8545");
+    window.web3 = new Web3(provider);
+  }
+
+  // Update contract with current provider
+  Identity.setProvider(window.web3.currentProvider);
+
+  // Save user data to local storage
   localStorage.setItem('mnemonic', mnemonic);
 
+  // Show
   document.getElementById('address').innerHTML = address;
   document.getElementById('mnemonic').innerHTML = mnemonic;
 
   //getIdent();
-}
+});
