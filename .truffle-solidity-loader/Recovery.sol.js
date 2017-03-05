@@ -231,13 +231,13 @@ var SolidityEvent = require("web3/lib/web3/event.js");
 
   Contract.new = function() {
     if (this.currentProvider == null) {
-      throw new Error("Identity error: Please call setProvider() first before calling new().");
+      throw new Error("Recovery error: Please call setProvider() first before calling new().");
     }
 
     var args = Array.prototype.slice.call(arguments);
 
     if (!this.unlinked_binary) {
-      throw new Error("Identity error: contract binary not set. Can't deploy new instance.");
+      throw new Error("Recovery error: contract binary not set. Can't deploy new instance.");
     }
 
     var regex = /__[^_]+_+/g;
@@ -256,7 +256,7 @@ var SolidityEvent = require("web3/lib/web3/event.js");
         return name != arr[index + 1];
       }).join(", ");
 
-      throw new Error("Identity contains unresolved libraries. You must deploy and link the following libraries before you can deploy a new version of Identity: " + unlinked_libraries);
+      throw new Error("Recovery contains unresolved libraries. You must deploy and link the following libraries before you can deploy a new version of Recovery: " + unlinked_libraries);
     }
 
     var self = this;
@@ -297,7 +297,7 @@ var SolidityEvent = require("web3/lib/web3/event.js");
 
   Contract.at = function(address) {
     if (address == null || typeof address != "string" || address.length != 42) {
-      throw new Error("Invalid address passed to Identity.at(): " + address);
+      throw new Error("Invalid address passed to Recovery.at(): " + address);
     }
 
     var contract_class = this.web3.eth.contract(this.abi);
@@ -308,7 +308,7 @@ var SolidityEvent = require("web3/lib/web3/event.js");
 
   Contract.deployed = function() {
     if (!this.address) {
-      throw new Error("Cannot find deployed address: Identity not deployed or address not set.");
+      throw new Error("Cannot find deployed address: Recovery not deployed or address not set.");
     }
 
     return this.at(this.address);
@@ -350,42 +350,24 @@ var SolidityEvent = require("web3/lib/web3/event.js");
   "default": {
     "abi": [
       {
-        "constant": false,
         "inputs": [
           {
-            "name": "_owner",
+            "name": "_id",
             "type": "address"
-          }
-        ],
-        "name": "transfer",
-        "outputs": [],
-        "payable": false,
-        "type": "function"
-      },
-      {
-        "constant": false,
-        "inputs": [
+          },
           {
-            "name": "_recovery",
-            "type": "address"
+            "name": "_contacts",
+            "type": "address[]"
           }
         ],
-        "name": "setRecovery",
-        "outputs": [],
-        "payable": false,
-        "type": "function"
-      },
-      {
-        "inputs": [],
         "payable": false,
         "type": "constructor"
       }
     ],
-    "unlinked_binary": "0x606060405234610000575b60008054600160a060020a03191633600160a060020a03161790555b5b610110806100366000396000f300606060405263ffffffff60e060020a6000350416631a6952308114602c578063f0d85c89146044575b6000565b346000576042600160a060020a0360043516605c565b005b346000576042600160a060020a036004351660a0565b005b60005433600160a060020a0390811691161415609b576000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0383161790555b5b5b50565b60005433600160a060020a0390811691161415609b576001805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0383161790555b5b5b505600a165627a7a72305820b8856306925cdd06dd9c840ee3ca2ca7d6a9c07d0cf9622d502fc1afc2fc7fdc0029",
+    "unlinked_binary": "0x6060604052346100005760405161013038038061013083398101604052805160208201519091015b60008054600160a060020a031916600160a060020a03841617815581516001805482825592819052917fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf690810191906020850182156100bc579160200282015b828111156100bc5782518254600160a060020a031916600160a060020a03909116178255602090920191600190910190610087565b5b506100e79291505b808211156100e3578054600160a060020a03191681556001016100c5565b5090565b50505b50505b6035806100fb6000396000f30060606040525b60005600a165627a7a72305820e7ff6a45d8357761371de7b2fe29b0e9a571f8d144dd82c84d05a778a468cda50029",
     "events": {},
-    "updated_at": 1488735394734,
-    "links": {},
-    "address": "0x95662fbf7eaf62c2b9a2d30f15c505d483447fde"
+    "updated_at": 1488735394728,
+    "links": {}
   }
 };
 
@@ -470,7 +452,7 @@ var SolidityEvent = require("web3/lib/web3/event.js");
     Contract.links[name] = address;
   };
 
-  Contract.contract_name   = Contract.prototype.contract_name   = "Identity";
+  Contract.contract_name   = Contract.prototype.contract_name   = "Recovery";
   Contract.generated_with  = Contract.prototype.generated_with  = "3.2.0";
 
   // Allow people to opt-in to breaking changes now.
@@ -510,6 +492,6 @@ var SolidityEvent = require("web3/lib/web3/event.js");
   } else {
     // There will only be one version of this contract in the browser,
     // and we can use that.
-    window.Identity = Contract;
+    window.Recovery = Contract;
   }
 })();

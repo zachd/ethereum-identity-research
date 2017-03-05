@@ -2,30 +2,35 @@ pragma solidity ^0.4.2;
 
 contract Identity {
 
-    struct Ident {
-    	uint id;
-        string name;
+    address owner;
+    string ipfs_hash;
+    address recovery;
+
+    modifier onlyOwner(){ 
+        if (msg.sender == owner) 
+            _; 
     }
-
-    uint identCount = 0;
-
-    mapping(address => Ident) idents;
 
     function Identity() {
-        newIdent("Test User");
+        owner = msg.sender;
     }
 
-    function getIdentCount() returns(uint) {
-        return identCount;
+    function setRecovery(address _recovery) onlyOwner {
+        recovery = _recovery;
     }
 
-    function newIdent(string name) returns(bool) {
-        identCount += 1;
-        idents[msg.sender] = Ident(identCount, name);
+    function setIPFSHash(string _ipfs_hash) onlyOwner {
+        ipfs_hash = _ipfs_hash;
     }
 
-    function getIdent(address owner) returns(uint id, string name) {
-        id = idents[owner].id;
-        name = idents[owner].name;
+    function transferOwner(address _owner) onlyOwner {
+        owner = _owner;
     }
+
+    function getDetails() returns (address _owner, string _ipfs_hash, address _recovery) {
+        _owner = owner;
+        _ipfs_hash = ipfs_hash;
+        _recovery = recovery;
+    }
+
 }

@@ -20,7 +20,7 @@ STEPS
 =====
 
 SIGNUP
-1. A public private key pair with recovery mnemonic is created for the user.
+1. A public private key pair with recovery mnemonic seed is created for the user.
 2. User selects the public keys of recovery users.
 2. A separate recovery public private key pair is also created.
   a) The recovery mnemonic is encrypted with the recovery public key.

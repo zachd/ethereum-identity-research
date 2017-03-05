@@ -14,14 +14,14 @@ module.exports = {
       { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader"},
       { test: /\.css$/, use: ExtractTextPlugin.extract({
         fallback: "style-loader", use: "css-loader"
-      })},
-      { test: /\.sol/, loader: "truffle-solidity-loader"}
+      })}
     ]
   },
   plugins: [
     new CopyWebpackPlugin([
       { from: './app/index.html', to: "index.html" },
-      { from: './app/images', to: "images" }
+      { from: './app/images', to: "images" },
+      { from: './contracts', to: "contracts" }
     ]),
     new ExtractTextPlugin("app.css")
   ],

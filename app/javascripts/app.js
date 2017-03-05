@@ -1,7 +1,6 @@
 var Web3 = require("web3");
 require("../stylesheets/app.css");
 var wallet_hdpath = "m/44'/60'/0'/0/";
-var Identity = require("../../contracts/Identity.sol");
 
 // HD/BIP39 Imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 var bip39 = require("bip39");
@@ -9,7 +8,7 @@ var hdkey = require('ethereumjs-wallet/hdkey');
 var HDWalletProvider = require("truffle-hdwallet-provider");
 
 // Global variables
-var identity;
+var contract;
 var mnemonic;
 var address;
 
@@ -19,30 +18,22 @@ function setStatus(message) {
 };
 
 function getIdent() {
-  identity.getIdent.call(address, {from: address}).then(function(resp) {
-    if(resp[0] > 0){
+  contract.getDetails.call({from: address}, function(err, result) {
+    if(result[0] > 0){
       show_hide("details", "new");
-      document.getElementById("userid").innerHTML = resp[0];
-      document.getElementById("username").innerHTML = resp[1];
-      document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=125x125&chl=" + resp[0];
-    } else {
+      document.getElementById("userid").innerHTML = result[0];
+      document.getElementById("username").innerHTML = result[1];
+      document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=125x125&chl=" + result[0];
+    } else {  
       show_hide("new", "details");
     }
-  }).catch(function(e) {
-    console.log(e);
-    setStatus("Error getting identity; see log.");
-  });
+  })
 };
 
-window.newIdent = function newIdent() {
-  var name = document.getElementById("name").value;
+function getRecovery() {
   setStatus("Initiating transaction...");
-  identity.newIdent(name, {from: address}).then(function(value) {
-    setStatus("Transaction complete!");
-    getIdent();
-  }).catch(function(e) {
-    setStatus("Error: Invalid transaction or identity already exists.");
-    console.log(e);
+  contract.getRecovery.call({from: address}, function(err, result) {
+    setStatus("Transaction complete! Result: " + result);
   });
 };
 
@@ -60,8 +51,48 @@ function show_hide(show, hide){
   document.getElementById(hide).style.display = "none";
 }
 
-function getRandomId() {
-  return Math.floor(Math.random() * 100) + 1;
+function compileIdentity() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', "/contracts/Identity.sol");
+  xhr.onload = function() {
+    web3.eth.compile.solidity(this.response, function(err, result) {
+      if(!err)
+        deployIdentity(result);
+      else
+        setStatus(err);
+    });
+  };
+  xhr.send();
+}
+
+function deployIdentity(compiledContract) {
+  // Create contract object
+  var contractObj = web3.eth.contract(compiledContract.info.abiDefinition);
+  setStatus("Creating Identity contract");
+
+  // Get gas estimation
+  web3.eth.estimateGas({data: compiledContract.code}, function(err, gasEstimate) {
+    setStatus("Contract deploy gas estimate: " + gasEstimate);
+    // Deploy contract
+    if(!err)
+      contract = contractObj.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
+        if(!err)
+          // Show deployed contract results
+          if(!deployResult.address) {
+            setStatus("Contract transaction sent. Waiting for deploy...");
+          } else {
+            // Update contract object with web3 provider
+            var contract_id = deployResult.address;
+            setStatus("Contract deployed! Address: " + contract_id);
+            localStorage.setItem('contract_id', contract_id);
+            getIdent();
+          }
+        else
+          setStatus(err);
+      });
+    else
+      setStatus(err);
+  });
 }
 
 function generateMnemonic() {
@@ -69,7 +100,6 @@ function generateMnemonic() {
 }
 
 window.addEventListener('load', function() {
-  identity = Identity.deployed();
 
   // Generate Wallet
   mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
@@ -86,15 +116,23 @@ window.addEventListener('load', function() {
     window.web3 = new Web3(provider);
   }
 
-  // Update contract with current provider
-  Identity.setProvider(window.web3.currentProvider);
+  // Get address balance
+  web3.eth.getBalance(address, function(err, result){
+    document.getElementById('balance').innerHTML = web3.fromWei(result, 'ether');
+  });
 
-  // Save user data to local storage
-  localStorage.setItem('mnemonic', mnemonic);
+  // Save user mnemonic and create ident
+  if(!(localStorage.getItem('mnemonic') && localStorage.getItem('contract_id'))){
+    localStorage.setItem('mnemonic', mnemonic);
+    compileIdentity();
+  }
 
-  // Show
+  // Show data on page
   document.getElementById('address').innerHTML = address;
   document.getElementById('mnemonic').innerHTML = mnemonic;
 
-  //getIdent();
+  // Add event listeners
+  document.getElementById("getRecovery").addEventListener("click", function() {getRecovery();});
+
 });
+

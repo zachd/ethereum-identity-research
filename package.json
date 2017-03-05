@@ -13,8 +13,8 @@
     "copy-webpack-plugin": "^4.0.1",
     "css-loader": "^0.26.2",
     "extract-text-webpack-plugin": "^2.0.0",
+    "solc": "^0.4.9",
     "style-loader": "^0.13.2",
-    "truffle-solidity-loader": "0.0.8",
     "webpack": "^2.2.1",
     "webpack-dev-server": "^2.4.1"
   },
