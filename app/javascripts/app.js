@@ -8,7 +8,7 @@ var hdkey = require('ethereumjs-wallet/hdkey');
 var HDWalletProvider = require("truffle-hdwallet-provider");
 
 // Global variables
-var contract;
+var identity;
 var mnemonic;
 var address;
 
@@ -17,8 +17,8 @@ function setStatus(message) {
   status.innerHTML = message;
 };
 
-function getIdent() {
-  contract.getDetails.call({from: address}, function(err, result) {
+function getIdentity() {
+  identity.getDetails.call({from: address}, function(err, result) {
     if(result[0] > 0){
       show_hide("details", "new");
       document.getElementById("userid").innerHTML = result[0];
@@ -28,13 +28,6 @@ function getIdent() {
       show_hide("new", "details");
     }
   })
-};
-
-function getRecovery() {
-  setStatus("Initiating transaction...");
-  contract.getRecovery.call({from: address}, function(err, result) {
-    setStatus("Transaction complete! Result: " + result);
-  });
 };
 
 function getUrlParameter(input) {
@@ -67,7 +60,8 @@ function compileIdentity() {
 
 function deployIdentity(compiledContract) {
   // Create contract object
-  var contractObj = web3.eth.contract(compiledContract.info.abiDefinition);
+  var contract_abi = web3.eth.contract(compiledContract.info.abiDefinition);
+  localStorage.setItem('contract_abi', JSON.stringify(compiledContract.info.abiDefinition));
   setStatus("Creating Identity contract");
 
   // Get gas estimation
@@ -75,7 +69,7 @@ function deployIdentity(compiledContract) {
     setStatus("Contract deploy gas estimate: " + gasEstimate);
     // Deploy contract
     if(!err)
-      contract = contractObj.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
+      identity = contract_abi.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
         if(!err)
           // Show deployed contract results
           if(!deployResult.address) {
@@ -85,7 +79,7 @@ function deployIdentity(compiledContract) {
             var contract_id = deployResult.address;
             setStatus("Contract deployed! Address: " + contract_id);
             localStorage.setItem('contract_id', contract_id);
-            getIdent();
+            getIdentity();
           }
         else
           setStatus(err);
@@ -125,14 +119,14 @@ window.addEventListener('load', function() {
   if(!(localStorage.getItem('mnemonic') && localStorage.getItem('contract_id'))){
     localStorage.setItem('mnemonic', mnemonic);
     compileIdentity();
+  } else {
+    var contract_abi = web3.eth.contract(JSON.parse(localStorage.getItem('contract_abi')));
+    identity = contract_abi.at(localStorage.getItem('contract_id'));
+    getIdentity();
   }
 
   // Show data on page
   document.getElementById('address').innerHTML = address;
   document.getElementById('mnemonic').innerHTML = mnemonic;
 
-  // Add event listeners
-  document.getElementById("getRecovery").addEventListener("click", function() {getRecovery();});
-
 });
-
