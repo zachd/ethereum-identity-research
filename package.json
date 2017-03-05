@@ -5,6 +5,9 @@
   "dependencies": {
     "bip39": "^2.2.0",
     "ethereumjs-wallet": "^0.6.0",
+    "ipfs-api": "^12.1.7",
+    "solc": "^0.4.9",
+    "truffle-hdwallet-provider": "0.0.3",
     "web3": "^0.18.2",
     "web3-provider-engine": "^9.1.0"
   },
@@ -13,7 +16,6 @@
     "copy-webpack-plugin": "^4.0.1",
     "css-loader": "^0.26.2",
     "extract-text-webpack-plugin": "^2.0.0",
-    "solc": "^0.4.9",
     "style-loader": "^0.13.2",
     "webpack": "^2.2.1",
     "webpack-dev-server": "^2.4.1"

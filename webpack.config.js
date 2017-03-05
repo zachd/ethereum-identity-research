@@ -27,5 +27,10 @@ module.exports = {
   ],
   devServer: {
     stats: 'errors-only',
+  },
+  resolve: {
+    alias: {
+      zlib: 'browserify-zlib-next'
+    }
   }
 };

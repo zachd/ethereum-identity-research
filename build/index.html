@@ -14,22 +14,16 @@
 
   <div id="details" style="display: none;height: 130px;">
     <img id="qrcode" style="float:left" />
-    <br />
-    <h4>ID: <span id="userid"> (none)</span></h4>
-    <h4>IPFS Hash: <span id="ipfshash"> (none)</span></h4>
-    <h4>Data: <span id="data"> (none)</span></h4>
+    <h4><br />ID: <span class="black"><span id="userid"> (none)</span></span></h4>
+    <h4>Name: <span class="black"><span id="username"> (none)</span></span></h4>
   </div>
   <div id="new">No identity found.</div>
 
-  <h1>Attributes</h1>
-  <div id="buttons">
-    <input id="attributes" type="text" />
-    <button id="setAttributes">setAttributes</button>
-  </div>
+  <div id="status"></div>
 
-  <br />
-  <h1>Log</h1>
-  <div id="logger">
+  <h1>Create Identity:</h1>
+  <div id="buttons">
+    <button id="getRecovery">getRecovery</button>
   </div>
 </body>
 </html>
