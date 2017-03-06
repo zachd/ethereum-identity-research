@@ -53,3 +53,25 @@ h4 {
 .err {
   color: red;
 }
+
+.contact {
+  display: inline-block;
+  padding: 5px;
+  margin: 3px;
+  border-radius: 3px;
+  border: 1px solid #ccc;
+}
+
+.contact:hover {
+  cursor: pointer;
+  background-color: #eee;
+}
+
+.contact.selected {
+  background-color: #ccc;
+}
+
+.contact img {
+  width: 30px;
+  height: 30px;
+}

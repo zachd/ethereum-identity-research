@@ -124,15 +124,15 @@ function show_hide(show, hide){
   document.getElementById(hide).style.display = "none";
 }
 
-function compileIdentity() {
-  log("Compiling Identity contract...");
+function compileContract(contract, callback) {
+  log("Compiling " + contract + " contract...");
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/contracts/Identity.sol");
+  xhr.open('GET', "/contracts/" + contract + ".sol");
   xhr.onload = function() {
     web3.eth.compile.solidity(this.response, function(err, result) {
       if(!err){
-        log("Identity contract compiled.");
-        deployIdentity(result);
+        log(contract + " contract compiled.");
+        callback(result);
       }
       else
         log(err);
@@ -172,6 +172,14 @@ function deployIdentity(compiledContract) {
   });
 }
 
+function showContacts() {
+  for(var i = 1; i <= 5; i++){
+    var contact = generateAddress(mnemonic, i);
+    document.getElementById("contacts").innerHTML += 
+      '<span id="contact-' + i + '" class="contact">User ' + i + '</span>';
+  }
+}
+
 function setUUID(contract_id) {
   uuid = contract_id;
   localStorage.setItem('contract_id', contract_id);
@@ -182,15 +190,19 @@ function generateMnemonic() {
   return bip39.generateMnemonic();
 }
 
+function generateAddress(mnemonic, index) {
+  var hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
+  wallet = hdwallet.derivePath(wallet_hdpath + index.toString()).getWallet();
+  return "0x" + wallet.getAddress().toString("hex");
+}
+
 window.addEventListener('load', function() {
   // Start logger
   document.getElementById('logger').innerHTML = "Ethereum Identity 1.0";
 
   // Generate Wallet
   mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
-  var hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
-  wallet = hdwallet.derivePath(wallet_hdpath + "0").getWallet();
-  address = "0x" + wallet.getAddress().toString("hex");
+  address = generateAddress(mnemonic, 0);
 
   log("User Address: " + address);
   log("Mnemonic: " + mnemonic);
@@ -214,7 +226,7 @@ window.addEventListener('load', function() {
   // Save user mnemonic and create ident
   if(!(localStorage.getItem('mnemonic') && localStorage.getItem('contract_id'))){
     localStorage.setItem('mnemonic', mnemonic);
-    compileIdentity();
+    compileContract('Identity', deployIdentity);
   } else {
     var contract_abi = web3.eth.contract(JSON.parse(localStorage.getItem('contract_abi')));
     setUUID(localStorage.getItem('contract_id'));
@@ -230,4 +242,10 @@ window.addEventListener('load', function() {
   document.getElementById('setAttributes').addEventListener('click', function() {
     setAttributes(document.getElementById('attributes').value);
   });
+  document.getElementById('contacts').addEventListener('click', function() {
+    if(event.target.tagName == "SPAN")
+      event.target.className = event.target.className == "contact" ? "contact selected" : "contact";
+  });
+
+  showContacts();
 });

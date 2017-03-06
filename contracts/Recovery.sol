@@ -2,12 +2,16 @@ pragma solidity ^0.4.2;
 
 contract Recovery {
 
-    address id;
+    address uuid;
     address[] contacts;
 
-    function Recovery(address _id, address[] _contacts) {
-        id = _id;
+    function Recovery(address _uuid, address[] _contacts) {
+        uuid = _uuid;
         contacts = _contacts;
     }
-    
+
+    function getDetails() returns (address[] _contacts) {
+        _contacts = contacts;
+    }
+
 }
