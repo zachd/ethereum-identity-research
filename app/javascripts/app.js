@@ -67,7 +67,7 @@ function setAttributes(input) {
   for (var att in attributes) {
     if (attributes.hasOwnProperty(att)){
       signatures[att] = {'uuid': uuid};
-      signatures[att]['signature'] = signAttribute(att);
+      signatures[att]['signature'] = signAttribute(att + ":" + attributes[att]);
     }
   }
   profile.uuid = uuid;
@@ -137,7 +137,7 @@ function compileContract(contract, callback) {
 function deployIdentity(compiledContract) {
   // Create contract object
   var contract_abi = web3.eth.contract(compiledContract.info.abiDefinition);
-  localStorage.setItem('contract_abi', JSON.stringify(compiledContract.info.abiDefinition));
+  localStorage.setItem('identity_abi', JSON.stringify(compiledContract.info.abiDefinition));
   log("Creating Identity contract...");
 
   // Get gas estimation
@@ -166,6 +166,8 @@ function deployIdentity(compiledContract) {
 }
 
 
+
+
 /* RECOVERY CONTACTS FUNCTIONS */
 function showContacts() {
   for(var i = 0; i < 10; i++){
@@ -176,7 +178,7 @@ function showContacts() {
   }
 }
 
-function getContacts() {
+function updateContacts() {
 
 }
 
@@ -204,7 +206,7 @@ function show_hide(show, hide){
 
 function setUUID(contract_id) {
   uuid = contract_id;
-  localStorage.setItem('contract_id', contract_id);
+  localStorage.setItem('uuid', contract_id);
   document.getElementById('uuid').innerHTML = contract_id;
 }
 
@@ -229,8 +231,8 @@ window.addEventListener('load', function() {
   user_index = getUrlParameter('id') || "0";
   if(user_index !== localStorage.getItem('user_index')){
     localStorage.setItem('user_index', user_index);
-    localStorage.removeItem('contract_id');
-    localStorage.removeItem('contract_abi');
+    localStorage.removeItem('uuid');
+    localStorage.removeItem('identity_abi');
   }
 
   // Generate Wallet
@@ -258,13 +260,13 @@ window.addEventListener('load', function() {
   });
 
   // Save user mnemonic and create ident
-  if(!(localStorage.getItem('mnemonic') && localStorage.getItem('contract_id'))){
+  if(!(localStorage.getItem('mnemonic') && localStorage.getItem('uuid'))){
     localStorage.setItem('mnemonic', mnemonic);
     compileContract('Identity', deployIdentity);
   } else {
-    var contract_abi = web3.eth.contract(JSON.parse(localStorage.getItem('contract_abi')));
-    setUUID(localStorage.getItem('contract_id'));
-    identity = contract_abi.at(localStorage.getItem('contract_id'));
+    var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
+    setUUID(localStorage.getItem('uuid'));
+    identity = identity_abi.at(localStorage.getItem('uuid'));
     getIdentity();
   }
 
@@ -277,8 +279,11 @@ window.addEventListener('load', function() {
     setAttributes(document.getElementById('attributes').value);
   });
   document.getElementById('contacts').addEventListener('click', function() {
-    if(event.target.tagName == "SPAN")
-      event.target.className = event.target.className == "contact" ? "contact selected" : "contact";
+    if(event.target.tagName == 'SPAN')
+      event.target.className = event.target.className == 'contact' ? 'contact selected' : 'contact';
+  });
+  document.getElementById('updateContacts').addEventListener('click', function() {
+    updateContacts(document.getElementsByClassName('contact selected'));
   });
 
   // Show contacts on page
