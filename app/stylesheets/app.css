@@ -60,6 +60,7 @@ h4 {
   margin: 3px;
   border-radius: 3px;
   border: 1px solid #ccc;
+  user-select: none;
 }
 
 .contact:hover {

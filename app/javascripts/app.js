@@ -1,38 +1,34 @@
 const Web3 = require("web3");
 require("../stylesheets/app.css");
 const wallet_hdpath = "m/44'/60'/0'/0/";
-const ethUtils = require("ethereumjs-util");
+const PROVIDER = "http://localhost:8545";
 
 // HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 const bip39 = require("bip39");
+const ethUtils = require("ethereumjs-util");
 const hdkey = require('ethereumjs-wallet/hdkey');
 const HDWalletProvider = require("truffle-hdwallet-provider");
 
-
 // Include IPFS
-const ipfsapi = require('ipfs-api')
-const ipfs = ipfsapi('localhost', '5002')
+const ipfsapi = require('ipfs-api');
+const ipfs = ipfsapi('localhost', '5002');
 
 // Global variables
 var identity;
 var uuid;
+var user_index;
 var mnemonic;
 var wallet;
 var address;
 
 // JSON profile
 var profile = {
-  "uuid": uuid,
+  "uuid": null,
   "attributes": null,
   "signatures": null
 };
 
-function log(msg) {
-  var logger = document.getElementById("logger");
-  logger.innerHTML += '<br />' + (msg.toString().match(/error/i) ? '<span class="err">' + msg + '</span>' : msg);
-  logger.scrollTop = logger.scrollHeight;
-};
-
+/* IDENTITY FUNCTIONS */
 function getIdentity() {
   identity.getDetails.call({from: address}, function(err, result) {
     if(!err && result[0] > 0){
@@ -47,7 +43,7 @@ function getIdentity() {
       show_hide("new", "details");
     }
   });
-};
+}
 
 function setIPFSHash(hash) {
   log("Updating IPFS hash in user profile...");
@@ -60,13 +56,16 @@ function setIPFSHash(hash) {
   });
 }
 
+/* ATTRIBUTE SETTING FUNCTIONS */
 function setAttributes(input) {
   var attributes = JSON.parse(input);
   var signatures = {};
   log("Signing attributes...");
   for (var att in attributes) {
-    if (attributes.hasOwnProperty(att))
-      signatures[att + '_signed'] = signAttribute(att);
+    if (attributes.hasOwnProperty(att)){
+      signatures[att] = {'uuid': uuid};
+      signatures[att]['signature'] = signAttribute(att);
+    }
   }
   profile.uuid = uuid;
   profile.attributes = attributes;
@@ -80,17 +79,6 @@ function setAttributes(input) {
     } else
       log(err);
   });
-}
-
-function signAttribute(attribute) {
-  var hash = ethUtils.sha3(attribute);
-  var signature = ethUtils.ecsign(hash, wallet.getPrivateKey());
-  verifyAttribute(hash, signature);
-  return signature;
-}
-
-function verifyAttribute(hash, signature) {
-  return ethUtils.ecrecover(hash, signature.v, signature.r, signature.s)
 }
 
 function getAttributes(hash) {
@@ -110,20 +98,22 @@ function getAttributes(hash) {
   });
 }
 
-function getUrlParameter(input) {
-    var vars = decodeURIComponent(window.location.search.substring(1)).split('&'), param;
-    for (var i = 0; i < vars.length; i++) {
-        param = vars[i].split('=');
-        if (param[0] === input)
-          return param[1] === undefined ? true : param[1];
-    }
+/* ATTRIBUTE SIGNATURE FUNCTIONS */
+function signAttribute(attribute) {
+  var hash = ethUtils.sha3(attribute);
+  var sig = ethUtils.ecsign(hash, wallet.getPrivateKey());
+  var RPCsig = ethUtils.toRpcSig(sig.v, sig.r, sig.s);
+  verifyAttribute(hash, RPCsig);
+  return RPCsig;
 }
 
-function show_hide(show, hide){
-  document.getElementById(show).style.display = "block";
-  document.getElementById(hide).style.display = "none";
+function verifyAttribute(hash, RPCsig) {
+  var sig = ethUtils.fromRpcSig(RPCsig);
+  return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
 }
 
+
+/* CONTRACT FUNCTIONS */
 function compileContract(contract, callback) {
   log("Compiling " + contract + " contract...");
   var xhr = new XMLHttpRequest();
@@ -172,12 +162,41 @@ function deployIdentity(compiledContract) {
   });
 }
 
+
+/* RECOVERY CONTACTS FUNCTIONS */
 function showContacts() {
-  for(var i = 1; i <= 5; i++){
-    var contact = generateAddress(mnemonic, i);
-    document.getElementById("contacts").innerHTML += 
-      '<span id="contact-' + i + '" class="contact">User ' + i + '</span>';
+  for(var i = 0; i < 10; i++){
+    var addr = "0x" + generateWallet(mnemonic, i).getAddress().toString("hex");
+    if(i !== parseInt(user_index))
+      document.getElementById("contacts").innerHTML += 
+       '<span id="contact-' + i + '" class="contact" data-address="' + addr + '">User ' + i + '</span>';
   }
+}
+
+function getContacts() {
+
+}
+
+
+/* HELPER FUNCTIONS */
+function log(msg) {
+  var logger = document.getElementById("logger");
+  logger.innerHTML += '<br />' + (msg.toString().match(/error/i) ? '<span class="err">' + msg + '</span>' : msg);
+  logger.scrollTop = logger.scrollHeight;
+}
+
+function getUrlParameter(input) {
+    var vars = decodeURIComponent(window.location.search.substring(1)).split('&'), param;
+    for (var i = 0; i < vars.length; i++) {
+        param = vars[i].split('=');
+        if (param[0] === input)
+          return param[1] === undefined ? true : param[1];
+    }
+}
+
+function show_hide(show, hide){
+  document.getElementById(show).style.display = "block";
+  document.getElementById(hide).style.display = "none";
 }
 
 function setUUID(contract_id) {
@@ -186,23 +205,35 @@ function setUUID(contract_id) {
   document.getElementById('uuid').innerHTML = contract_id;
 }
 
+
+/* KEY GENERATION FUNCTIONS */
 function generateMnemonic() {
   return bip39.generateMnemonic();
 }
 
-function generateAddress(mnemonic, index) {
+function generateWallet(mnemonic, index) {
   var hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
-  wallet = hdwallet.derivePath(wallet_hdpath + index.toString()).getWallet();
-  return "0x" + wallet.getAddress().toString("hex");
+  return hdwallet.derivePath(wallet_hdpath + index).getWallet();
 }
 
+
+/* MAIN LOAD EVENT */
 window.addEventListener('load', function() {
   // Start logger
   document.getElementById('logger').innerHTML = "Ethereum Identity 1.0";
 
+  // Get user index
+  user_index = getUrlParameter('id') || "0";
+  if(user_index !== localStorage.getItem('user_index')){
+    localStorage.setItem('user_index', user_index);
+    localStorage.removeItem('contract_id');
+    localStorage.removeItem('contract_abi');
+  }
+
   // Generate Wallet
   mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
-  address = generateAddress(mnemonic, 0);
+  wallet = generateWallet(mnemonic, user_index);
+  address = "0x" + wallet.getAddress().toString("hex");
 
   log("User Address: " + address);
   log("Mnemonic: " + mnemonic);
@@ -212,7 +243,7 @@ window.addEventListener('load', function() {
   if (typeof web3 !== 'undefined') {
     window.web3 = new Web3(web3.currentProvider);
   } else {
-    var provider = new HDWalletProvider(mnemonic, "http://localhost:8545");
+    var provider = new HDWalletProvider(mnemonic, PROVIDER, user_index);
     window.web3 = new Web3(provider);
   }
   log("Web3 Provider: " + web3.currentProvider.constructor.name);
@@ -238,7 +269,7 @@ window.addEventListener('load', function() {
   document.getElementById('address').innerHTML = address;
   document.getElementById('mnemonic').innerHTML = mnemonic;
 
-  // Add event listener
+  // Add button event listeners
   document.getElementById('setAttributes').addEventListener('click', function() {
     setAttributes(document.getElementById('attributes').value);
   });
@@ -247,5 +278,6 @@ window.addEventListener('load', function() {
       event.target.className = event.target.className == "contact" ? "contact selected" : "contact";
   });
 
+  // Show contacts on page
   showContacts();
 });
