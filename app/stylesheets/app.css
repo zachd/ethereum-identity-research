@@ -10,8 +10,9 @@ label {
 }
 
 input {
-  width: 500px;
+  width: 300px;
   padding: 5px;
+  margin: 3px;
   font-size: 16px;
 }
 

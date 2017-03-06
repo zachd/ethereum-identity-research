@@ -18,8 +18,10 @@ const PROVIDER = "http://localhost:8545";
 
 // Contract variables
 var uuid;
-var identity;
-var recovery;
+var contracts = {
+  'identity': null,
+  'recovery': null,
+}
 
 // Wallet variables
 var user_index;
@@ -36,7 +38,7 @@ var profile = {
 
 /* IDENTITY FUNCTIONS */
 function getIdentity() {
-  identity.getDetails.call({from: address}, function(err, result) {
+  contracts.identity.getDetails.call({from: address}, function(err, result) {
     if(!hasError(err) && result[0] > 0){
       show_hide("details", "new");
       document.getElementById("owner").innerHTML = result[0];
@@ -51,7 +53,7 @@ function getIdentity() {
 
 function setIPFSHash(hash) {
   log("Updating IPFS hash in user profile...");
-  identity.setIPFSHash.sendTransaction(hash, {from: address}, function(err, result) {
+  contracts.identity.setIPFSHash.sendTransaction(hash, {from: address}, function(err, result) {
     if(!hasError(err)) {
       log("IPFS hash updated successfully.");
       getIdentity();
@@ -61,7 +63,7 @@ function setIPFSHash(hash) {
 
 /* ATTRIBUTE SETTING FUNCTIONS */
 function setAttributes(input) {
-  var attributes = JSON.parse(input);
+  var attributes = getAttributesFromForm();
   var signatures = {};
   log("Signing attributes...");
   for (var att in attributes) {
@@ -90,10 +92,16 @@ function getAttributes(hash) {
       stream.on('data', function(buffer){
         file += buffer.toString();
       });
-      stream.on('end',function(){
-        var attributes = JSON.stringify(JSON.parse(file.toString()).attributes);
-        document.getElementById("data").innerHTML = JSON.stringify(JSON.parse(file.toString()), null, 2);
-        document.getElementById("attributes").value = attributes;
+      stream.on('end', function(){
+        // Update attributes form
+        var attributes = JSON.parse(file.toString()).attributes;
+        document.getElementById('attributes').innerHTML = '';
+        for (var att in attributes)
+          if (attributes.hasOwnProperty(att))
+            addAttribute(att, attributes[att]);
+        // Update user data section
+        document.getElementById("data").innerHTML = JSON.stringify(
+          JSON.parse(file.toString()), null, 2);
       });
     }
   });
@@ -113,9 +121,38 @@ function verifyAttribute(hash, RPCsig) {
   return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
 }
 
+/* ATTRIBUTE ELEMENT FUNCTIONS */
+function addAttribute(name, value){
+  var attributes = document.getElementById('attributes');
+  attributes.dataset.num += 1;
+  attributes.innerHTML +=
+    '<div class="attribute">' +
+      '<input type="text" value="' + name + '""><input type="text" value="' + value + '"> ' +
+      '<button>&nbsp;-&nbsp;</button>' +
+    '</div>';
+}
+
+function getAttributesFromForm() {
+  var attributes = {};
+  var elements = document.getElementsByClassName('attribute');
+  for(var elem of elements){
+    var inputs = elem.getElementsByTagName('input');
+    attributes[inputs[0].value] = inputs[1].value;
+  }
+  return attributes;
+}
+
 
 /* CONTRACT FUNCTIONS */
-function compileContract(contract, callback) {
+function deployIdentity(contract_id) {
+  setUUID(contract_id);
+  getIdentity();
+}
+
+function deployRecovery(contract_id) {
+}
+
+function compileDeployContract(contract, callback) {
   log("Compiling " + contract + " contract...");
   var xhr = new XMLHttpRequest();
   xhr.open('GET', "/contracts/" + contract + ".sol");
@@ -125,55 +162,36 @@ function compileContract(contract, callback) {
         var contract_abi = web3.eth.contract(result.info.abiDefinition);
         localStorage.setItem(contract.toLowerCase() + '_abi', JSON.stringify(result.info.abiDefinition));
         log(contract + " contract compiled.");
-        callback(result);
+        deployContract(contract, contract_abi, result, callback);
       }
     });
   };
   xhr.send();
 }
 
-function deployIdentity(compiledContract) {
+function deployContract(contract, contractABI, compiledContract, callback) {
   // Create contract object
-  log("Creating Identity contract...");
+  log("Creating " + contract + " contract...");
 
   // Get gas estimation
   web3.eth.estimateGas({data: compiledContract.code}, function(err, gasEstimate) {
-    log("Identity contract gas estimate: " + gasEstimate);
+    log(contract + " contract gas estimate: " + gasEstimate);
     // Deploy contract
     if(!hasError(err))
-      identity = contract_abi.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
+      contracts[contract.toLowerCase()] = contractABI.new(
+        {from: address, data: compiledContract.code, gas: gasEstimate},
+        function(err, deployResult){
           // Show deployed contract results
-        if(!hasError(err))
-          if(!deployResult.address) {
-            log("Contract transaction sent. Waiting for deploy...");
-          } else {
-            // Update contract object with web3 provider
-            var contract_id = deployResult.address;
-            log("Contract deployed. Address: " + contract_id);
-            setUUID(contract_id);
-            getIdentity();
-          }
-      });
-  });
-}
-
-function deployRecovery(compiledContract) {
-  log("Creating Recovery contract...");
-
-  // Get gas estimation
-  web3.eth.estimateGas({data: compiledContract.code}, function(err, gasEstimate) {
-    log("Recovery contract gas estimate: " + gasEstimate);
-    // Deploy contract
-    if(!hasError(err))
-      recovery = contract_abi.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
-        // Show deployed contract results
-        if(!hasError(err))
-          if(!deployResult.address) {
-            log("Contract transaction sent. Waiting for deploy...");
-          } else {
-            log("Contract deployed. Address: " + deployResult.address);
-          }
-      });
+          if(!hasError(err))
+            if(!deployResult.address) {
+              log(contract + " contract tx sent. Waiting for deploy...");
+            } else {
+              var contract_id = deployResult.address;
+              log(contract + " contract deployed. Address: " + contract_id);
+              callback(contract_id);
+            }
+        }
+      );
   });
 }
 
@@ -286,8 +304,8 @@ window.addEventListener('load', function() {
   // Save user mnemonic and create ident
   if(!(localStorage.getItem('mnemonic') && localStorage.getItem('uuid'))){
     localStorage.setItem('mnemonic', mnemonic);
-    compileContract('Identity', deployIdentity);
-    compileContract('Recovery', deployRecovery);
+    compileDeployContract('Identity', deployIdentity);
+    compileDeployContract('Recovery', deployRecovery);
   } else {
     var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
     setUUID(localStorage.getItem('uuid'));
@@ -309,6 +327,13 @@ window.addEventListener('load', function() {
   });
   document.getElementById('updateContacts').addEventListener('click', function() {
     updateContacts(getContacts());
+  });
+  document.getElementById('addAttribute').addEventListener('click', function() {
+    addAttribute('', '');
+  });
+  document.getElementById('attributes').addEventListener('click', function() {
+    if(event.target.tagName == 'BUTTON')
+      event.target.parentElement.parentElement.removeChild(event.target.parentElement);
   });
 
   // Show contacts on page
