@@ -37,7 +37,7 @@ function getIdentity() {
   identity.getDetails.call({from: address}, function(err, result) {
     if(!err && result[0] > 0){
       show_hide("details", "new");
-      document.getElementById("userid").innerHTML = result[0];
+      document.getElementById("owner").innerHTML = result[0];
       document.getElementById("ipfshash").innerHTML = result[1];
       document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=125x125&chl=" + result[0];
       if(result[1])
@@ -161,8 +161,7 @@ function deployIdentity(compiledContract) {
             // Update contract object with web3 provider
             var contract_id = deployResult.address;
             log("Contract deployed. Address: " + contract_id);
-            uuid = localStorage.getItem('contract_id');
-            localStorage.setItem('contract_id', contract_id);
+            setUUID(contract_id);
             getIdentity();
           }
         else
@@ -171,6 +170,12 @@ function deployIdentity(compiledContract) {
     else
       log(err);
   });
+}
+
+function setUUID(contract_id) {
+  uuid = contract_id;
+  localStorage.setItem('contract_id', contract_id);
+  document.getElementById('uuid').innerHTML = contract_id;
 }
 
 function generateMnemonic() {
@@ -212,7 +217,7 @@ window.addEventListener('load', function() {
     compileIdentity();
   } else {
     var contract_abi = web3.eth.contract(JSON.parse(localStorage.getItem('contract_abi')));
-    uuid = localStorage.getItem('contract_id');
+    setUUID(localStorage.getItem('contract_id'));
     identity = contract_abi.at(localStorage.getItem('contract_id'));
     getIdentity();
   }
