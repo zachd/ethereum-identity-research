@@ -16,9 +16,12 @@ const ipfs = ipfsapi('localhost', '5002');
 const QRCODE_SIZE = "75x75";
 const PROVIDER = "http://localhost:8545";
 
-// Global variables
-var identity;
+// Contract variables
 var uuid;
+var identity;
+var recovery;
+
+// Wallet variables
 var user_index;
 var mnemonic;
 var wallet;
@@ -34,28 +37,25 @@ var profile = {
 /* IDENTITY FUNCTIONS */
 function getIdentity() {
   identity.getDetails.call({from: address}, function(err, result) {
-    if(!err && result[0] > 0){
+    if(!hasError(err) && result[0] > 0){
       show_hide("details", "new");
       document.getElementById("owner").innerHTML = result[0];
       document.getElementById("ipfshash").innerHTML = result[1];
       document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" + QRCODE_SIZE + "&chl=" + result[0];
       if(result[1])
         getAttributes(result[1]);
-    } else {  
-      log(err);
+    } else
       show_hide("new", "details");
-    }
   });
 }
 
 function setIPFSHash(hash) {
   log("Updating IPFS hash in user profile...");
   identity.setIPFSHash.sendTransaction(hash, {from: address}, function(err, result) {
-    if (!err) {
+    if(!hasError(err)) {
       log("IPFS hash updated successfully.");
       getIdentity();
-    } else
-      log(err);
+    }
   });
 }
 
@@ -75,18 +75,17 @@ function setAttributes(input) {
   profile.signatures = signatures;
   log("Saving attributes to IPFS...");
   ipfs.files.add(new Buffer(JSON.stringify(profile)), function (err, result) {
-    if (!err) {
+    if(!hasError(err)) {
       log("Attributes saved successfully.");
       var hash = result[0].hash;
       setIPFSHash(hash);
-    } else
-      log(err);
+    }
   });
 }
 
 function getAttributes(hash) {
   ipfs.files.cat(hash, function (err, stream) {
-    if(!err) {
+    if(!hasError(err)) {
       var file = '';
       stream.on('data', function(buffer){
         file += buffer.toString();
@@ -96,8 +95,7 @@ function getAttributes(hash) {
         document.getElementById("data").innerHTML = JSON.stringify(JSON.parse(file.toString()), null, 2);
         document.getElementById("attributes").value = attributes;
       });
-    } else
-      log(err);
+    }
   });
 }
 
@@ -123,12 +121,12 @@ function compileContract(contract, callback) {
   xhr.open('GET', "/contracts/" + contract + ".sol");
   xhr.onload = function() {
     web3.eth.compile.solidity(this.response, function(err, result) {
-      if(!err){
+      if(!hasError(err)) {
+        var contract_abi = web3.eth.contract(result.info.abiDefinition);
+        localStorage.setItem(contract.toLowerCase() + '_abi', JSON.stringify(result.info.abiDefinition));
         log(contract + " contract compiled.");
         callback(result);
       }
-      else
-        log(err);
     });
   };
   xhr.send();
@@ -136,18 +134,16 @@ function compileContract(contract, callback) {
 
 function deployIdentity(compiledContract) {
   // Create contract object
-  var contract_abi = web3.eth.contract(compiledContract.info.abiDefinition);
-  localStorage.setItem('identity_abi', JSON.stringify(compiledContract.info.abiDefinition));
   log("Creating Identity contract...");
 
   // Get gas estimation
   web3.eth.estimateGas({data: compiledContract.code}, function(err, gasEstimate) {
     log("Identity contract gas estimate: " + gasEstimate);
     // Deploy contract
-    if(!err)
+    if(!hasError(err))
       identity = contract_abi.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
-        if(!err)
           // Show deployed contract results
+        if(!hasError(err))
           if(!deployResult.address) {
             log("Contract transaction sent. Waiting for deploy...");
           } else {
@@ -157,15 +153,29 @@ function deployIdentity(compiledContract) {
             setUUID(contract_id);
             getIdentity();
           }
-        else
-          log(err);
       });
-    else
-      log(err);
   });
 }
 
+function deployRecovery(compiledContract) {
+  log("Creating Recovery contract...");
 
+  // Get gas estimation
+  web3.eth.estimateGas({data: compiledContract.code}, function(err, gasEstimate) {
+    log("Recovery contract gas estimate: " + gasEstimate);
+    // Deploy contract
+    if(!hasError(err))
+      recovery = contract_abi.new({from: address, data: compiledContract.code, gas: gasEstimate}, function(err, deployResult){
+        // Show deployed contract results
+        if(!hasError(err))
+          if(!deployResult.address) {
+            log("Contract transaction sent. Waiting for deploy...");
+          } else {
+            log("Contract deployed. Address: " + deployResult.address);
+          }
+      });
+  });
+}
 
 
 /* RECOVERY CONTACTS FUNCTIONS */
@@ -178,8 +188,14 @@ function showContacts() {
   }
 }
 
-function updateContacts() {
+function getContacts() {
+  var contacts = document.getElementsByClassName('contact selected');
+  var contacts_arr = [].slice.call(contacts);
+  return contacts_arr.map(function(elem) { return elem.dataset.address; });
+}
 
+function updateContacts(contacts) {
+  console.log(contacts);
 }
 
 
@@ -188,6 +204,12 @@ function log(msg) {
   var logger = document.getElementById("logger");
   logger.innerHTML += '<br />' + (msg.toString().match(/error/i) ? '<span class="err">' + msg + '</span>' : msg);
   logger.scrollTop = logger.scrollHeight;
+}
+
+function hasError(err) {
+  if(err)
+    log(err);
+  return err;
 }
 
 function getUrlParameter(input) {
@@ -255,14 +277,17 @@ window.addEventListener('load', function() {
 
   // Get address balance
   web3.eth.getBalance(address, function(err, result){
-    document.getElementById('balance').innerHTML = web3.fromWei(result, 'ether');
-    log("User Balance: " + web3.fromWei(result, 'ether'));
+    if(!hasError(err)) {
+      document.getElementById('balance').innerHTML = web3.fromWei(result, 'ether');
+      log("User Balance: " + web3.fromWei(result, 'ether'));
+    }
   });
 
   // Save user mnemonic and create ident
   if(!(localStorage.getItem('mnemonic') && localStorage.getItem('uuid'))){
     localStorage.setItem('mnemonic', mnemonic);
     compileContract('Identity', deployIdentity);
+    compileContract('Recovery', deployRecovery);
   } else {
     var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
     setUUID(localStorage.getItem('uuid'));
@@ -283,7 +308,7 @@ window.addEventListener('load', function() {
       event.target.className = event.target.className == 'contact' ? 'contact selected' : 'contact';
   });
   document.getElementById('updateContacts').addEventListener('click', function() {
-    updateContacts(document.getElementsByClassName('contact selected'));
+    updateContacts(getContacts());
   });
 
   // Show contacts on page
