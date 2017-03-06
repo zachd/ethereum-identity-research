@@ -1,11 +1,13 @@
 const Web3 = require("web3");
 require("../stylesheets/app.css");
 const wallet_hdpath = "m/44'/60'/0'/0/";
+const ethUtils = require("ethereumjs-util");
 
-// HD/BIP39 Imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
+// HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 const bip39 = require("bip39");
 const hdkey = require('ethereumjs-wallet/hdkey');
 const HDWalletProvider = require("truffle-hdwallet-provider");
+
 
 // Include IPFS
 const ipfsapi = require('ipfs-api')
@@ -13,8 +15,17 @@ const ipfs = ipfsapi('localhost', '5002')
 
 // Global variables
 var identity;
+var uuid;
 var mnemonic;
+var wallet;
 var address;
+
+// JSON profile
+var profile = {
+  "uuid": uuid,
+  "attributes": null,
+  "signatures": null
+};
 
 function log(msg) {
   var logger = document.getElementById("logger");
@@ -25,11 +36,12 @@ function log(msg) {
 function getIdentity() {
   identity.getDetails.call({from: address}, function(err, result) {
     if(!err && result[0] > 0){
-      getAttributes(result[1]);
       show_hide("details", "new");
       document.getElementById("userid").innerHTML = result[0];
       document.getElementById("ipfshash").innerHTML = result[1];
       document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=125x125&chl=" + result[0];
+      if(result[1])
+        getAttributes(result[1]);
     } else {  
       log(err);
       show_hide("new", "details");
@@ -42,22 +54,43 @@ function setIPFSHash(hash) {
   identity.setIPFSHash.sendTransaction(hash, {from: address}, function(err, result) {
     if (!err) {
       log("IPFS hash updated successfully.");
+      getIdentity();
     } else
       log(err);
   });
 }
 
-function setAttributes(attributes) {
+function setAttributes(input) {
+  var attributes = JSON.parse(input);
+  var signatures = {};
+  log("Signing attributes...");
+  for (var att in attributes) {
+    if (attributes.hasOwnProperty(att))
+      signatures[att + '_signed'] = signAttribute(att);
+  }
+  profile.uuid = uuid;
+  profile.attributes = attributes;
+  profile.signatures = signatures;
   log("Saving attributes to IPFS...");
-  ipfs.files.add(new Buffer(attributes), function (err, result) {
+  ipfs.files.add(new Buffer(JSON.stringify(profile)), function (err, result) {
     if (!err) {
       log("Attributes saved successfully.");
       var hash = result[0].hash;
       setIPFSHash(hash);
-      getAttributes(hash);
     } else
       log(err);
   });
+}
+
+function signAttribute(attribute) {
+  var hash = ethUtils.sha3(attribute);
+  var signature = ethUtils.ecsign(hash, wallet.getPrivateKey());
+  verifyAttribute(hash, signature);
+  return signature;
+}
+
+function verifyAttribute(hash, signature) {
+  return ethUtils.ecrecover(hash, signature.v, signature.r, signature.s)
 }
 
 function getAttributes(hash) {
@@ -68,8 +101,9 @@ function getAttributes(hash) {
         file += buffer.toString();
       });
       stream.on('end',function(){
+        var attributes = JSON.stringify(JSON.parse(file.toString()).attributes);
         document.getElementById("data").innerHTML = file.toString();
-        document.getElementById("attributes").value = file.toString();
+        document.getElementById("attributes").value = attributes;
       });
     } else
       log(err);
@@ -127,6 +161,7 @@ function deployIdentity(compiledContract) {
             // Update contract object with web3 provider
             var contract_id = deployResult.address;
             log("Contract deployed. Address: " + contract_id);
+            uuid = localStorage.getItem('contract_id');
             localStorage.setItem('contract_id', contract_id);
             getIdentity();
           }
@@ -149,7 +184,7 @@ window.addEventListener('load', function() {
   // Generate Wallet
   mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
   var hdwallet = hdkey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
-  var wallet = hdwallet.derivePath(wallet_hdpath + "0").getWallet();
+  wallet = hdwallet.derivePath(wallet_hdpath + "0").getWallet();
   address = "0x" + wallet.getAddress().toString("hex");
 
   log("User Address: " + address);
@@ -177,6 +212,7 @@ window.addEventListener('load', function() {
     compileIdentity();
   } else {
     var contract_abi = web3.eth.contract(JSON.parse(localStorage.getItem('contract_abi')));
+    uuid = localStorage.getItem('contract_id');
     identity = contract_abi.at(localStorage.getItem('contract_id'));
     getIdentity();
   }

@@ -4,6 +4,7 @@
   "description": "Ethereum digital identity project.",
   "dependencies": {
     "bip39": "^2.2.0",
+    "ethereumjs-util": "^5.1.1",
     "ethereumjs-wallet": "^0.6.0",
     "ipfs-api": "^12.1.7",
     "solc": "^0.4.9",
