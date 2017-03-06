@@ -12,13 +12,13 @@
     Mnemonic: <span id="mnemonic"></span>
   </h4>
 
-  <div id="details" style="display: none;height: 130px;">
+  <div id="details" style="display: none;">
     <img id="qrcode" style="float:left" />
-    <br />
-    <h4>ID: <span id="uuid"> (none)</span></h4>
+    <h4 style="padding-top: 10px;">ID: <span id="uuid"> (none)</span></h4>
     <h4>Owner: <span id="owner"> (none)</span></h4>
     <h4>IPFS Hash: <span id="ipfshash"> (none)</span></h4>
-    <h4>Data: <span id="data"> (none)</span></h4>
+    <br />
+    <textarea id="data"> (none)</textarea>
   </div>
   <div id="new">No identity found.</div>
 
@@ -34,7 +34,6 @@
     <button id="setAttributes">setAttributes</button>
   </div>
 
-  <br />
   <h1>Log</h1>
   <div id="logger">
   </div>

@@ -1,7 +1,6 @@
 const Web3 = require("web3");
 require("../stylesheets/app.css");
 const wallet_hdpath = "m/44'/60'/0'/0/";
-const PROVIDER = "http://localhost:8545";
 
 // HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 const bip39 = require("bip39");
@@ -12,6 +11,10 @@ const HDWalletProvider = require("truffle-hdwallet-provider");
 // Include IPFS
 const ipfsapi = require('ipfs-api');
 const ipfs = ipfsapi('localhost', '5002');
+
+// Global settings
+const QRCODE_SIZE = "75x75";
+const PROVIDER = "http://localhost:8545";
 
 // Global variables
 var identity;
@@ -35,7 +38,7 @@ function getIdentity() {
       show_hide("details", "new");
       document.getElementById("owner").innerHTML = result[0];
       document.getElementById("ipfshash").innerHTML = result[1];
-      document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=125x125&chl=" + result[0];
+      document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" + QRCODE_SIZE + "&chl=" + result[0];
       if(result[1])
         getAttributes(result[1]);
     } else {  
@@ -90,7 +93,7 @@ function getAttributes(hash) {
       });
       stream.on('end',function(){
         var attributes = JSON.stringify(JSON.parse(file.toString()).attributes);
-        document.getElementById("data").innerHTML = file.toString();
+        document.getElementById("data").innerHTML = JSON.stringify(JSON.parse(file.toString()), null, 2);
         document.getElementById("attributes").value = attributes;
       });
     } else
