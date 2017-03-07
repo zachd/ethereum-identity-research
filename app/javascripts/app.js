@@ -18,9 +18,9 @@ const PROVIDER = "http://localhost:8545";
 
 // Contract variables
 var uuid;
+var recovery;
 var contracts = {
-  'identity': null,
-  'recovery': null,
+  'identity': null
 }
 
 // Wallet variables
@@ -40,12 +40,15 @@ var profile = {
 function getIdentity() {
   contracts.identity.getDetails.call({from: address}, function(err, result) {
     if(!hasError(err) && result[0] > 0){
+      // Show details in identity section
       show_hide("details", "new");
       document.getElementById("owner").innerHTML = result[0];
-      document.getElementById("ipfshash").innerHTML = result[1];
+      document.getElementById("ipfshash").innerHTML = result[1] || '(none)';
+      document.getElementById("recovery").innerHTML = result[2];
       document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" + QRCODE_SIZE + "&chl=" + result[0];
       if(result[1])
         getAttributes(result[1]);
+      updateRecovery(result[2]);
     } else
       show_hide("new", "details");
   });
@@ -60,6 +63,35 @@ function setIPFSHash(hash) {
     }
   });
 }
+
+
+/* RECOVERY FUNCTIONS */
+function updateRecovery(recovery_address) {
+  var recovery_abi = web3.eth.contract(JSON.parse(localStorage.getItem('recovery_abi')));
+  contracts.recovery = recovery_abi.at(recovery_address);
+  localStorage.setItem('recovery_address', recovery_address);
+}
+
+function getRecovery() {
+  contracts.recovery.getContacts.call({from: address}, function(err, result) {
+    if(!hasError(err) && result){
+      for (var contact of result)
+        document.getElementById('contact-' + contact).className = "contact selected";
+    }
+  });
+}
+
+function setContacts() {
+  var contacts = getContacts();
+  log("Updating contacts in recovery profile...");
+  contracts.identity.setContacts.sendTransaction(contacts, {from: address}, function(err, result) {
+    if(!hasError(err)) {
+      log("Recovery contacts updated successfully.");
+      getRecovery();
+    }
+  });
+}
+
 
 /* ATTRIBUTE SETTING FUNCTIONS */
 function setAttributes(input) {
@@ -107,6 +139,7 @@ function getAttributes(hash) {
   });
 }
 
+
 /* ATTRIBUTE SIGNATURE FUNCTIONS */
 function signAttribute(attribute) {
   var hash = ethUtils.sha3(attribute);
@@ -120,6 +153,7 @@ function verifyAttribute(hash, RPCsig) {
   var sig = ethUtils.fromRpcSig(RPCsig);
   return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
 }
+
 
 /* ATTRIBUTE ELEMENT FUNCTIONS */
 function addAttribute(name, value){
@@ -149,20 +183,18 @@ function deployIdentity(contract_id) {
   getIdentity();
 }
 
-function deployRecovery(contract_id) {
-}
-
-function compileDeployContract(contract, callback) {
+function compileContract(contract, callback) {
   log("Compiling " + contract + " contract...");
   var xhr = new XMLHttpRequest();
   xhr.open('GET', "/contracts/" + contract + ".sol");
   xhr.onload = function() {
     web3.eth.compile.solidity(this.response, function(err, result) {
       if(!hasError(err)) {
+        log(contract + " contract compiled.");
         var contract_abi = web3.eth.contract(result.info.abiDefinition);
         localStorage.setItem(contract.toLowerCase() + '_abi', JSON.stringify(result.info.abiDefinition));
-        log(contract + " contract compiled.");
-        deployContract(contract, contract_abi, result, callback);
+        if(callback)
+          deployContract(contract, contract_abi, result, callback);
       }
     });
   };
@@ -170,7 +202,6 @@ function compileDeployContract(contract, callback) {
 }
 
 function deployContract(contract, contractABI, compiledContract, callback) {
-  // Create contract object
   log("Creating " + contract + " contract...");
 
   // Get gas estimation
@@ -188,6 +219,7 @@ function deployContract(contract, contractABI, compiledContract, callback) {
             } else {
               var contract_id = deployResult.address;
               log(contract + " contract deployed. Address: " + contract_id);
+              localStorage.setItem(contract.toLowerCase() + '_address', contract_id);
               callback(contract_id);
             }
         }
@@ -196,24 +228,21 @@ function deployContract(contract, contractABI, compiledContract, callback) {
 }
 
 
-/* RECOVERY CONTACTS FUNCTIONS */
+/* CONTACTS ELEMENT FUNCTIONS */
 function showContacts() {
   for(var i = 0; i < 10; i++){
     var addr = "0x" + generateWallet(mnemonic, i).getAddress().toString("hex");
-    if(i !== parseInt(user_index))
-      document.getElementById("contacts").innerHTML += 
-       '<span id="contact-' + i + '" class="contact" data-address="' + addr + '">User ' + i + '</span>';
+    document.getElementById("contacts").innerHTML += 
+      '<span id="contact-' + addr + '" class="contact' + (i == parseInt(user_index) ? ' disabled' : '') + '">' +
+        'User ' + i +
+      '</span>';
   }
 }
 
 function getContacts() {
   var contacts = document.getElementsByClassName('contact selected');
   var contacts_arr = [].slice.call(contacts);
-  return contacts_arr.map(function(elem) { return elem.dataset.address; });
-}
-
-function updateContacts(contacts) {
-  console.log(contacts);
+  return contacts_arr.map(function(elem) { return elem.id.substr(8); });
 }
 
 
@@ -246,7 +275,6 @@ function show_hide(show, hide){
 
 function setUUID(contract_id) {
   uuid = contract_id;
-  localStorage.setItem('uuid', contract_id);
   document.getElementById('uuid').innerHTML = contract_id;
 }
 
@@ -271,8 +299,10 @@ window.addEventListener('load', function() {
   user_index = getUrlParameter('id') || "0";
   if(user_index !== localStorage.getItem('user_index')){
     localStorage.setItem('user_index', user_index);
-    localStorage.removeItem('uuid');
     localStorage.removeItem('identity_abi');
+    localStorage.removeItem('recovery_abi');
+    localStorage.removeItem('identity_address');
+    localStorage.removeItem('recovery_address');
   }
 
   // Generate Wallet
@@ -302,15 +332,18 @@ window.addEventListener('load', function() {
   });
 
   // Save user mnemonic and create ident
-  if(!(localStorage.getItem('mnemonic') && localStorage.getItem('uuid'))){
+  if(!(localStorage.getItem('mnemonic') && localStorage.getItem('identity_address'))){
     localStorage.setItem('mnemonic', mnemonic);
-    compileDeployContract('Identity', deployIdentity);
-    compileDeployContract('Recovery', deployRecovery);
+    compileContract('Identity', deployIdentity);
+    compileContract('Recovery', null);
   } else {
+    setUUID(localStorage.getItem('identity_address'));
     var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
-    setUUID(localStorage.getItem('uuid'));
-    identity = identity_abi.at(localStorage.getItem('uuid'));
+    var recovery_abi = web3.eth.contract(JSON.parse(localStorage.getItem('recovery_abi')));
+    contracts.identity = identity_abi.at(localStorage.getItem('identity_address'));
+    contracts.recovery = recovery_abi.at(localStorage.getItem('recovery_address'));
     getIdentity();
+    getRecovery();
   }
 
   // Show data on page
@@ -325,8 +358,8 @@ window.addEventListener('load', function() {
     if(event.target.tagName == 'SPAN')
       event.target.className = event.target.className == 'contact' ? 'contact selected' : 'contact';
   });
-  document.getElementById('updateContacts').addEventListener('click', function() {
-    updateContacts(getContacts());
+  document.getElementById('setContacts').addEventListener('click', function() {
+    setContacts();
   });
   document.getElementById('addAttribute').addEventListener('click', function() {
     addAttribute('', '');

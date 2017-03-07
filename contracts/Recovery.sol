@@ -5,13 +5,20 @@ contract Recovery {
     address uuid;
     address[] contacts;
 
-    function Recovery(address _uuid, address[] _contacts) {
+    modifier onlyUuid(){
+        if (msg.sender == uuid)
+            _;
+    }
+
+    function Recovery(address _uuid) {
         uuid = _uuid;
+    }
+
+    function setContacts(address[] _contacts) onlyUuid {
         contacts = _contacts;
     }
 
-    function getDetails() returns (address[] _contacts) {
+    function getContacts() returns (address[] _contacts) {
         _contacts = contacts;
     }
-
 }
