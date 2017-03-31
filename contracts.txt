@@ -52,3 +52,43 @@ RECOVER LOST KEY
 
 RECOVER LEAKED/STOLEN KEY
 1. Same steps as above, but the user then decrypts existing attribute data and transfers it to an account with new keys.
+
+
+NOTES
+=====
+
+SIGNATURES
+timestamp included - validity period
+store old identities
+
+PROJECT LIFECYCLE
+track story of implementation
+creation, usage, compromise, restoration
+
+EMAIL
+reference model of email
+PKCS7 (datatype with secure fields), PKI, certs, verisign
+send signed message once, get cert, encryption
+
+ETHEREUM EVENTS
+logging/save state
+notify of changes
+
+TIMESTAMPS
+add timestamp to signatures
+keep old registry entries
+
+LOOK UP 16/03/16
+pgp signing parties
+current solidity version
+other ethereum high level languages
+gitter webchat - uport demo devcon2
+
+
+AUTHENTICATION 23/03/16
+same as last time
+check with IdP
+
+ENVELOPE
+transport system (twitter/reddit/email)
+

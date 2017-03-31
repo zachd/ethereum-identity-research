@@ -8,6 +8,7 @@
     "ethereumjs-wallet": "^0.6.0",
     "ipfs-api": "^12.1.7",
     "solc": "^0.4.9",
+    "sweetalert2": "^6.4.3",
     "truffle-hdwallet-provider": "0.0.3",
     "web3": "^0.18.2",
     "web3-provider-engine": "^9.1.0"

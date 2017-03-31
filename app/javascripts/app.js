@@ -13,21 +13,22 @@ const ipfsapi = require('ipfs-api');
 const ipfs = ipfsapi('localhost', '5002');
 
 // Global settings
-const QRCODE_SIZE = "75x75";
+const QRCODE_SIZE = "75";
 const PROVIDER = "http://localhost:8545";
+const REGISTRY_ADDRESS = "0xe84f45d399ad74b736e7f82b0623ebb1d4cc81a6";
 
 // Contract variables
 var uuid;
 var recovery;
-var contracts = {
-  'identity': null
-}
+var contracts = {}
 
 // Wallet variables
 var user_index;
+var profile_index;
 var mnemonic;
 var wallet;
 var address;
+var profile_address;
 
 // JSON profile
 var profile = {
@@ -37,21 +38,41 @@ var profile = {
 };
 
 /* IDENTITY FUNCTIONS */
-function getIdentity() {
-  contracts.identity.getDetails.call({from: address}, function(err, result) {
-    if(!hasError(err) && result[0] > 0){
-      // Show details in identity section
-      show_hide("details", "new");
-      document.getElementById("owner").innerHTML = result[0];
-      document.getElementById("ipfshash").innerHTML = result[1] || '(none)';
-      document.getElementById("recovery").innerHTML = result[2];
-      document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" + QRCODE_SIZE + "&chl=" + result[0];
-      if(result[1])
-        getAttributes(result[1]);
-      updateRecovery(result[2]);
-    } else
-      show_hide("new", "details");
+function getIdentity(contract_address) {
+  var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
+  var contract = identity_abi.at(contract_address);
+  document.getElementById("profileuuid").innerHTML = contract_address + ' (User ' + profile_index + ')';
+  contract.getDetails.call({from: address}, function(err, result) {
+    if(!hasError(err))
+      showIdentity(result);
   });
+}
+
+// Show details in identity section
+function showIdentity(result) {
+  if(result[0] > 0){
+    show_hide("details", "new");
+    // Update profile box
+    document.getElementById("owner").innerHTML = result[0];
+    document.getElementById("ipfshash").innerHTML = result[1] || '(none)';
+    document.getElementById("recovery").innerHTML = result[2];
+    document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" 
+      + QRCODE_SIZE + "x" + QRCODE_SIZE + "&chl=" + result[0];
+    document.getElementById("qrcode").style = "width: " + QRCODE_SIZE + "px; height:" + QRCODE_SIZE + "px";
+    document.getElementById('attributes').innerHTML = '';
+    document.getElementById('ipfs-attributes').innerHTML = '';
+    // Update attributes section
+    if(result[1])
+      getAttributes(result[1]);
+    // Update recovery contacts
+    if(user_index == profile_index){
+      if(result[2]){
+        setContract('Recovery', result[2]);
+        getRecoveryContacts();
+      }
+    }
+  } else
+    show_hide("new", "details");
 }
 
 function setIPFSHash(hash) {
@@ -59,20 +80,14 @@ function setIPFSHash(hash) {
   contracts.identity.setIPFSHash.sendTransaction(hash, {from: address}, function(err, result) {
     if(!hasError(err)) {
       log("IPFS hash updated successfully.");
-      getIdentity();
     }
   });
 }
 
 
 /* RECOVERY FUNCTIONS */
-function updateRecovery(recovery_address) {
-  var recovery_abi = web3.eth.contract(JSON.parse(localStorage.getItem('recovery_abi')));
-  contracts.recovery = recovery_abi.at(recovery_address);
-  localStorage.setItem('recovery_address', recovery_address);
-}
-
-function getRecovery() {
+function getRecoveryContacts() {
+  refreshContacts();
   contracts.recovery.getContacts.call({from: address}, function(err, result) {
     if(!hasError(err) && result){
       for (var contact of result)
@@ -81,16 +96,84 @@ function getRecovery() {
   });
 }
 
-function setContacts() {
+function setRecoveryContacts() {
   var contacts = getContacts();
   log("Updating contacts in recovery profile...");
   contracts.identity.setContacts.sendTransaction(contacts, {from: address}, function(err, result) {
     if(!hasError(err)) {
       log("Recovery contacts updated successfully.");
-      getRecovery();
+      getRecoveryContacts();
     }
   });
 }
+
+/* REGISTRY FUNCTIONS */
+function compileContracts() {
+  if(!localStorage.getItem('identity_abi'))
+    compileContract('Identity', checkUsers);
+  else
+    checkUsers();
+  if(!localStorage.getItem('recovery_abi'))
+    compileContract('Recovery', null);
+}
+
+function checkUsers(contract_result) {
+  findUUID(address, showUser, registerUser, contract_result);
+  findUUID(profile_address, showProfile, profileNotFound);
+}
+
+function findUUID(key, found, not_found, contract_result) {
+  contracts.registry.get.call(key, {from: address}, function(err, result) {
+    if(!hasError(err) && web3.toDecimal(result)){
+      log("Registry result found: " + result);
+      found(result, contract_result);
+    } else {
+      log("Registry result not found: " + result);
+      not_found(result, contract_result);
+    }
+  });
+}
+
+function showUser(contract_address) {
+  setUUID(contract_address);
+}
+
+function registerUser(contract_address, contract_result) {
+  if(contract_result)
+    deployContract(contract_result, "Identity", registerUUID);
+  else
+    compileContract("Identity", deployContract, registerUUID);
+}
+
+function showProfile(contract_address) {
+  getIdentity(contract_address);
+}
+
+function profileNotFound(contract_address) {
+  log("Error: Profile not found.");
+}
+
+function registerUUID(contract_address) {
+  setUUID(contract_address);
+
+  log("Adding UUID to Registry...");
+  contracts.registry.add.sendTransaction(address, contract_address, {from: address}, function(err, result) {
+    if(!hasError(err)) {
+      log("UUID registered successfully.");
+    }
+  });
+
+  if(user_index == profile_index)
+    getIdentity(contract_address);
+}
+
+function setUUID(contract_address) {
+  uuid = contract_address;
+  setContract('Identity', contract_address);
+  document.getElementById('uuid').innerHTML = contract_address 
+    + ' (User ' + user_index + ')';
+}
+
 
 
 /* ATTRIBUTE SETTING FUNCTIONS */
@@ -100,7 +183,7 @@ function setAttributes(input) {
   log("Signing attributes...");
   for (var att in attributes) {
     if (attributes.hasOwnProperty(att)){
-      signatures[att] = {'uuid': uuid};
+      signatures[att] = {'address': address};
       signatures[att]['signature'] = signAttribute(att + ":" + attributes[att]);
     }
   }
@@ -126,14 +209,14 @@ function getAttributes(hash) {
       });
       stream.on('end', function(){
         // Update attributes form
-        var attributes = JSON.parse(file.toString()).attributes;
-        document.getElementById('attributes').innerHTML = '';
-        for (var att in attributes)
-          if (attributes.hasOwnProperty(att))
-            addAttribute(att, attributes[att]);
-        // Update user data section
-        document.getElementById("data").innerHTML = JSON.stringify(
-          JSON.parse(file.toString()), null, 2);
+        var data = JSON.parse(file.toString());
+        for (var att in data.attributes){
+          if (data.attributes.hasOwnProperty(att)){
+            addAttribute(att, data.attributes[att]);
+            addIDAttribute(att, data.attributes[att], 
+              data.signatures[att].address, data.signatures[att].signature);
+          }
+        }
       });
     }
   });
@@ -145,25 +228,32 @@ function signAttribute(attribute) {
   var hash = ethUtils.sha3(attribute);
   var sig = ethUtils.ecsign(hash, wallet.getPrivateKey());
   var RPCsig = ethUtils.toRpcSig(sig.v, sig.r, sig.s);
-  verifyAttribute(hash, RPCsig);
   return RPCsig;
 }
 
-function verifyAttribute(hash, RPCsig) {
+function verifyAttribute(attribute, RPCsig) {
+  var hash = ethUtils.sha3(attribute);
   var sig = ethUtils.fromRpcSig(RPCsig);
   return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
+}
+
+function setVerified(element, result) {
+  var textresult = result ? 'Verified' : 'Unverified';
+  element.className = "ipfs-verify-status " + textresult.toLowerCase();
+  element.innerHTML = textresult;
 }
 
 
 /* ATTRIBUTE ELEMENT FUNCTIONS */
 function addAttribute(name, value){
-  var attributes = document.getElementById('attributes');
-  attributes.dataset.num += 1;
-  attributes.innerHTML +=
-    '<div class="attribute">' +
-      '<input type="text" value="' + name + '""><input type="text" value="' + value + '"> ' +
-      '<button>&nbsp;-&nbsp;</button>' +
-    '</div>';
+  var container = document.getElementById('attributes');
+  var attribute = document.createElement('div');
+  attribute.className = 'attribute';
+  attribute.innerHTML =
+    '<input type="text" value="' + name + '">' +
+    '<input type="text" value="' + value + '"> ' +
+    '<button>&nbsp;-&nbsp;</button>';
+  container.appendChild(attribute);
 }
 
 function getAttributesFromForm() {
@@ -176,51 +266,74 @@ function getAttributesFromForm() {
   return attributes;
 }
 
-
-/* CONTRACT FUNCTIONS */
-function deployIdentity(contract_id) {
-  setUUID(contract_id);
-  getIdentity();
+function addIDAttribute(name, value, signer, signature) {
+  var ipfsattributes = document.getElementById('ipfs-attributes');
+  ipfsattributes.innerHTML +=
+    '<div class="ipfs-attribute">' +
+      '<div><span class="ipfs-attribute-name">' + name + '</span>: ' +
+      '<span class="ipfs-attribute-value">' + value + '</span></div>' +
+      '<div>Signed by: <span class="ipfs-attribute-signer">' + signer + '</span></div>' +
+      '<div class="ipfs-attribute-buttons" data-attribute="' + name + ':' + value + '">' +
+        '<button class="ipfs-attribute-sign">Sign</button>' +
+        '<button class="ipfs-attribute-verify" data-signature="' + signature + '">Verify</button>' +
+        '<span class="ipfs-verify-status unverified">Unverified</span>'
+      '</div>' + 
+    '</div>';
 }
 
-function compileContract(contract, callback) {
-  log("Compiling " + contract + " contract...");
+
+/* CONTRACT FUNCTIONS */
+function setRegistry() {
+  setContract('Registry', REGISTRY_ADDRESS);
+  compileContracts();
+}
+
+function setContract(contract_name, contract_address) {
+  var contract_obj = web3.eth.contract(JSON.parse(localStorage.getItem(contract_name.toLowerCase() + '_abi')));
+  contracts[contract_name.toLowerCase()] = contract_obj.at(contract_address);
+  localStorage.setItem(contract_name.toLowerCase() + '_address', contract_address);
+}
+
+function compileContract(contract_name, callback, deploy_callback) {
+  log("Compiling " + contract_name + " contract...");
+  var params = params || [];
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/contracts/" + contract + ".sol");
+  xhr.open('GET', "/contracts/" + contract_name + ".sol");
   xhr.onload = function() {
     web3.eth.compile.solidity(this.response, function(err, result) {
       if(!hasError(err)) {
-        log(contract + " contract compiled.");
-        var contract_abi = web3.eth.contract(result.info.abiDefinition);
-        localStorage.setItem(contract.toLowerCase() + '_abi', JSON.stringify(result.info.abiDefinition));
+        log(contract_name + " contract compiled.");
+        localStorage.setItem(contract_name.toLowerCase() + '_abi', JSON.stringify(result.info.abiDefinition));
         if(callback)
-          deployContract(contract, contract_abi, result, callback);
+          callback.apply(null, [result, contract_name, deploy_callback]);
       }
     });
   };
   xhr.send();
 }
 
-function deployContract(contract, contractABI, compiledContract, callback) {
-  log("Creating " + contract + " contract...");
+function deployContract(result, contract_name, callback) {
+  log("Deploying " + contract_name + " contract...");
+  var contract_obj = web3.eth.contract(result.info.abiDefinition);
 
   // Get gas estimation
-  web3.eth.estimateGas({data: compiledContract.code}, function(err, gasEstimate) {
-    log(contract + " contract gas estimate: " + gasEstimate);
+  web3.eth.estimateGas({data: result.code}, function(err, gasEstimate) {
+    log(contract_name + " contract gas estimate: " + gasEstimate);
     // Deploy contract
     if(!hasError(err))
-      contracts[contract.toLowerCase()] = contractABI.new(
-        {from: address, data: compiledContract.code, gas: gasEstimate},
+      contracts[contract_name.toLowerCase()] = contract_obj.new(
+        {from: address, data: result.code, gas: gasEstimate},
         function(err, deployResult){
           // Show deployed contract results
           if(!hasError(err))
             if(!deployResult.address) {
-              log(contract + " contract tx sent. Waiting for deploy...");
+              log(contract_name + " contract tx sent. Waiting for deploy...");
             } else {
               var contract_id = deployResult.address;
-              log(contract + " contract deployed. Address: " + contract_id);
-              localStorage.setItem(contract.toLowerCase() + '_address', contract_id);
-              callback(contract_id);
+              log(contract_name + " contract deployed. Address: " + contract_id);
+              localStorage.setItem(contract_name.toLowerCase() + '_address', contract_id);
+              if(callback)
+                callback(contract_id);
             }
         }
       );
@@ -232,7 +345,7 @@ function deployContract(contract, contractABI, compiledContract, callback) {
 function showContacts() {
   for(var i = 0; i < 10; i++){
     var addr = "0x" + generateWallet(mnemonic, i).getAddress().toString("hex");
-    document.getElementById("contacts").innerHTML += 
+    document.getElementById("contacts").innerHTML +=
       '<span id="contact-' + addr + '" class="contact' + (i == parseInt(user_index) ? ' disabled' : '') + '">' +
         'User ' + i +
       '</span>';
@@ -243,6 +356,12 @@ function getContacts() {
   var contacts = document.getElementsByClassName('contact selected');
   var contacts_arr = [].slice.call(contacts);
   return contacts_arr.map(function(elem) { return elem.id.substr(8); });
+}
+
+function refreshContacts() {
+  var contacts = document.getElementsByClassName('contact');
+  for(var contact of contacts)
+    contact.className = 'contact';
 }
 
 
@@ -273,12 +392,6 @@ function show_hide(show, hide){
   document.getElementById(hide).style.display = "none";
 }
 
-function setUUID(contract_id) {
-  uuid = contract_id;
-  document.getElementById('uuid').innerHTML = contract_id;
-}
-
-
 /* KEY GENERATION FUNCTIONS */
 function generateMnemonic() {
   return bip39.generateMnemonic();
@@ -290,17 +403,13 @@ function generateWallet(mnemonic, index) {
 }
 
 
-/* MAIN LOAD EVENT */
-window.addEventListener('load', function() {
-  // Start logger
-  document.getElementById('logger').innerHTML = "Ethereum Identity 1.0";
+/* LOGIN FUNCTION */
+function walletLogin(user_index, first_run) {
+  log("Logging in as User " + user_index);
 
-  // Get user index
-  user_index = getUrlParameter('id') || "0";
+  // Reset saved state from previous user
   if(user_index !== localStorage.getItem('user_index')){
     localStorage.setItem('user_index', user_index);
-    localStorage.removeItem('identity_abi');
-    localStorage.removeItem('recovery_abi');
     localStorage.removeItem('identity_address');
     localStorage.removeItem('recovery_address');
   }
@@ -309,13 +418,14 @@ window.addEventListener('load', function() {
   mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
   wallet = generateWallet(mnemonic, user_index);
   address = "0x" + wallet.getAddress().toString("hex");
+  profile_address = "0x" + generateWallet(mnemonic, profile_index).getAddress().toString("hex");
 
   log("User Address: " + address);
   log("Mnemonic: " + mnemonic);
 
   // Supports Metamask and Mist, and other wallets that provide 'web3'
   // http://truffleframework.com/tutorials/bundling-with-webpack
-  if (typeof web3 !== 'undefined') {
+  if (first_run && typeof window.web3 !== 'undefined') {
     window.web3 = new Web3(web3.currentProvider);
   } else {
     var provider = new HDWalletProvider(mnemonic, PROVIDER, user_index);
@@ -331,24 +441,28 @@ window.addEventListener('load', function() {
     }
   });
 
-  // Save user mnemonic and create ident
-  if(!(localStorage.getItem('mnemonic') && localStorage.getItem('identity_address'))){
-    localStorage.setItem('mnemonic', mnemonic);
-    compileContract('Identity', deployIdentity);
-    compileContract('Recovery', null);
-  } else {
-    setUUID(localStorage.getItem('identity_address'));
-    var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
-    var recovery_abi = web3.eth.contract(JSON.parse(localStorage.getItem('recovery_abi')));
-    contracts.identity = identity_abi.at(localStorage.getItem('identity_address'));
-    contracts.recovery = recovery_abi.at(localStorage.getItem('recovery_address'));
-    getIdentity();
-    getRecovery();
-  }
+  // Compile Registry and find profiles
+  compileContract('Registry', setRegistry);
 
   // Show data on page
   document.getElementById('address').innerHTML = address;
   document.getElementById('mnemonic').innerHTML = mnemonic;
+  document.getElementById("user_changer").children[user_index].selected = true;
+}
+
+/* MAIN LOAD EVENT */
+window.addEventListener('load', function() {
+  // Start logger
+  document.getElementById('logger').innerHTML = "Ethereum Identity 1.0";
+
+  // Get user and profile index
+  user_index = localStorage.getItem('user_index') || "0";
+  profile_index = getUrlParameter('id') || user_index;
+
+  walletLogin(user_index, true);
+
+  if (window.location.pathname == '/registry/')
+    compileContract('Registry', deployContract);
 
   // Add button event listeners
   document.getElementById('setAttributes').addEventListener('click', function() {
@@ -359,7 +473,7 @@ window.addEventListener('load', function() {
       event.target.className = event.target.className == 'contact' ? 'contact selected' : 'contact';
   });
   document.getElementById('setContacts').addEventListener('click', function() {
-    setContacts();
+    setRecoveryContacts();
   });
   document.getElementById('addAttribute').addEventListener('click', function() {
     addAttribute('', '');
@@ -367,6 +481,27 @@ window.addEventListener('load', function() {
   document.getElementById('attributes').addEventListener('click', function() {
     if(event.target.tagName == 'BUTTON')
       event.target.parentElement.parentElement.removeChild(event.target.parentElement);
+  });
+  document.getElementById('ipfs-attributes').addEventListener('click', function() {
+    if(event.target.className == 'ipfs-attribute-verify'){
+      var result = verifyAttribute(event.target.parentNode.dataset.attribute, event.target.dataset.signature);
+      setVerified(event.target.nextElementSibling, result);
+    }
+  });
+  document.getElementById('user_changer').addEventListener('change', function() {
+    // Set indexes
+    user_index = event.target.value;
+    profile_index = getUrlParameter('id') || user_index;
+    // Hide user details
+    document.getElementById("uuid").innerHTML = "(none)";
+    // Hide profile details
+    if(user_index == profile_index)
+      show_hide("new", "details");
+    // Reset logger
+    var logger = document.getElementById("logger");
+    logger.innerHTML = "Changing User...";
+    // Login as user
+    walletLogin(user_index, false);
   });
 
   // Show contacts on page

@@ -23,8 +23,8 @@
   </div>
   <h4>
     User ID: <span id="uuid">(none)</span><br />
-    Address: <span id="address"></span> (Balance: <span id="balance"></span>)<br />
-    Mnemonic: <span id="mnemonic"></span>
+    Address: <span id="address">(none)</span> (Balance: <span id="balance">0</span>)<br />
+    Mnemonic: <span id="mnemonic">(none)</span>
   </h4>
 
   <div id="details" style="display: none;" class="info_box">
@@ -39,13 +39,13 @@
   </div>
   <div id="new" class="info_box">Loading...</div>
 
-  <div>
+  <div style="display: none;">
     <h2>Select Contacts</h2>
     <div id="contacts"></div>
     <button id="setContacts">Save Contacts</button>
   </div>
 
-  <div>
+  <div style="display: none;">
     <h1>Attributes <button id="addAttribute">&nbsp;+&nbsp;</button></h1>
     <div id="attributes"></div>
     <button id="setAttributes">Save Attributes</button>

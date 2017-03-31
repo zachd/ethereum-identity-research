@@ -33,20 +33,61 @@ h1 {
   font-size: 26px;
 }
 
-h4 {
+h3, h4 {
   margin: 0px;
+  line-height: 1.2;
 }
 
-#details {
+/* USER DETAILS */
+.info_box {
   white-space: nowrap;
   margin-top: 20px;
+  padding: 10px;
+  background-color: #eee;
+  border-radius: 3px;
+}
+.user_select {
+  float: right;
+  margin: 15px;
+}
+#qrcode {
+  float: left;
+  margin-right: 3px;
 }
 
-#data {
-  width: 100%;
-  height: 170px;
+/* ATTRIBUTES */
+.ipfs-attribute {
+  padding: 5px;
+  font-size: 14px;
+}
+.ipfs-attribute-name, .ipfs-attribute-value {
+  font-family: "Courier New", Courier, monospace;
+  font-weight: bold;
+}
+.ipfs-attribute-buttons button {
+  font-size: 14px;
+  padding: 2px;
+  margin: 2px 2px 0px 0px;
+}
+.ipfs-attribute-signer {
+  width: 150px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+}
+.unverified {
+  color: #D50F25;
+}
+.verifiying {
+  color: #EEB211;
+}
+.verified {
+  color: #009925;
 }
 
+/* LOGGER */
 #logger {
   font-family: "Courier New", Courier, monospace;
   font-size: 13px;
@@ -56,15 +97,16 @@ h4 {
   width: 100%;
   height: 200px;
 }
-
 .err {
   color: red;
 }
 
+
+/* CONTACTS */
 .contact {
   display: inline-block;
   padding: 10px 10px 10px 33px;
-  margin: 3px;
+  margin: 2px;
   border-radius: 3px;
   font-size: 14px;
   border: 1px solid #ccc;
@@ -72,17 +114,14 @@ h4 {
   background: url(/images/icon-user.png) no-repeat 5px;
   background-size: 25px;
 }
-
 .contact:hover {
   cursor: pointer;
   background-color: #eee;
 }
-
 .contact.selected {
   background-color: #ccc;
   border: 1px solid #aaa;
 }
-
 .contact img {
   width: 30px;
   height: 30px;

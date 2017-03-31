@@ -20,6 +20,8 @@ module.exports = {
   plugins: [
     new CopyWebpackPlugin([
       { from: './app/index.html', to: "index.html" },
+      { from: './app/user/index.html', to: "user/index.html" },
+      { from: './app/registry/index.html', to: "registry/index.html" },
       { from: './app/images', to: "images" },
       { from: './contracts', to: "contracts" }
     ]),
