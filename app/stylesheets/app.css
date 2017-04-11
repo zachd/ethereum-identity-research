@@ -1,51 +1,4 @@
-body {
-  margin-left: 15%;
-  margin-right: 15%;
-  font-family: "Open Sans", sans-serif;
-}
-
-label {
-  display: inline-block;
-  width: 100px;
-}
-
-input {
-  width: 300px;
-  padding: 5px;
-  margin: 3px;
-  font-size: 16px;
-}
-
-button {
-  font-size: 16px;
-  padding: 5px;
-  margin-top: 5px;
-}
-
-h1, h2 {
-  display: inline-block;
-  vertical-align: middle;
-  margin-top: 20px;
-  margin-bottom: 10px;
-}
-
-h1 {
-  font-size: 26px;
-}
-
-h3, h4 {
-  margin: 0px;
-  line-height: 1.2;
-}
-
 /* USER DETAILS */
-.info_box {
-  white-space: nowrap;
-  margin-top: 20px;
-  padding: 10px;
-  background-color: #eee;
-  border-radius: 3px;
-}
 .user_select {
   float: right;
   margin: 15px;
@@ -56,18 +9,9 @@ h3, h4 {
 }
 
 /* ATTRIBUTES */
-.ipfs-attribute {
-  padding: 5px;
-  font-size: 14px;
-}
 .ipfs-attribute-name, .ipfs-attribute-value {
   font-family: "Courier New", Courier, monospace;
   font-weight: bold;
-}
-.ipfs-attribute-buttons button {
-  font-size: 14px;
-  padding: 2px;
-  margin: 2px 2px 0px 0px;
 }
 .ipfs-attribute-signer {
   width: 150px;

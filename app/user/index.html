@@ -10,7 +10,7 @@
     <div class="ui container">
       <h1>Identity</h1>
       <div class="user_select">
-        <select id="user_changer">
+        <select id="user_changer" class="ui fluid dropdown">
           <option value="0">User 0</option>
           <option value="1">User 1</option>
           <option value="2">User 2</option>
@@ -40,7 +40,7 @@
 
   <div id="profile-tab" class="ui tab active">
     <div class="ui main container">
-      <div id="details" style="display: none" class="info_box">
+      <div id="details" style="display: none">
         <h3>User ID: <span id="profileuuid"> (none)</span></h3>
         <img id="qrcode" />
         <h4>Owner: <span id="owner"> (none)</span><br />
@@ -51,14 +51,15 @@
         </h4>
         <div id="ipfs-attributes">(no data)</div>
       </div>
-      <div id="new" class="info_box">Loading...</div>
+      <div id="new"><h3>Loading...</h3></div>
     </div>
   </div>
   <div id="attributes-tab" class="ui tab">
     <div class="ui main container">
-      <h1>Attributes <button id="addAttributeFormRow">&nbsp;+&nbsp;</button></h1>
-      <div id="attributes"></div>
-      <button id="setAttributes">Save Attributes</button>
+      <h2>Attributes <button id="addAttributeFormRow" class="mini ui positive basic button">Add Attribute</button></h2>
+      <div id="attributes" class="ui form"></div>
+      <br />
+      <button id="setAttributes" class="ui primary button">Save Attributes</button>
     </div>
   </div>
 
@@ -66,13 +67,14 @@
     <div class="ui main container">
       <h2>Select Contacts</h2>
       <div id="contacts"></div>
-      <button id="setContacts">Save Contacts</button>
+      <br />
+      <button id="setContacts" class="ui primary button">Save Contacts</button>
     </div>
   </div>
 
   <div id="log-tab" class="ui tab">
     <div class="ui main container">
-      <h1>Log</h1>
+      <h2>Log</h2>
       <div id="logger"></div>
     </div>
   </div>

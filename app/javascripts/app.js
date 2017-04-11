@@ -244,7 +244,7 @@ function verifyAttribute(attribute, RPCsig) {
 
 function setVerified(element, result) {
   var textresult = result ? 'Verified' : 'Unverified';
-  element.className = "ipfs-verify-status " + textresult.toLowerCase();
+  element.className = textresult.toLowerCase();
   element.innerHTML = textresult;
 }
 
@@ -255,9 +255,9 @@ function addAttributeFormRow(name, value){
   var attribute = document.createElement('div');
   attribute.className = 'attribute';
   attribute.innerHTML =
-    '<input type="text" value="' + name + '">' +
-    '<input type="text" value="' + value + '"> ' +
-    '<button>&nbsp;-&nbsp;</button>';
+    '<div class="fields"><span class="three field"><input type="text" value="' + name + '"></span>' +
+    '<span class="three field"><input type="text" value="' + value + '"></span>' +
+    '<span class="one field"><i class="ui icon remove circle red large"></i></span></div>';
   container.appendChild(attribute);
 }
 
@@ -279,9 +279,9 @@ function addAttributeIDElem(name, value, signer, signature) {
       '<span class="ipfs-attribute-value">' + value + '</span></div>' +
       '<div>Signed by: <span class="ipfs-attribute-signer">' + signer + '</span></div>' +
       '<div class="ipfs-attribute-buttons" data-attribute="' + name + ':' + value + '">' +
-        '<button class="ipfs-attribute-sign">Sign</button>' +
-        '<button class="ipfs-attribute-verify" data-signature="' + signature + '">Verify</button>' +
-        '<span class="ipfs-verify-status unverified">Unverified</span>'
+        '<button id="ipfs-attr-sign" class="mini ui basic grey button">Sign</button>' +
+        '<button id="ipfs-attr-verify" class="mini ui basic grey button" data-signature="' + signature + '">Verify</button>' +
+        '<span class="unverified">Unverified</span>'
       '</div>' + 
     '</div>';
 }
@@ -500,11 +500,12 @@ window.addEventListener('load', function() {
     addAttributeFormRow('', '');
   });
   elem('attributes').addEventListener('click', function() {
-    if(event.target.tagName == 'BUTTON')
-      event.target.parentElement.parentElement.removeChild(event.target.parentElement);
+    var attr = event.target.parentElement.parentElement;
+    if(event.target.tagName == 'I')
+      attr.parentElement.removeChild(attr);
   });
   elem('ipfs-attributes').addEventListener('click', function() {
-    if(event.target.className == 'ipfs-attribute-verify'){
+    if(event.target.id == 'ipfs-attr-verify'){
       var result = verifyAttribute(event.target.parentNode.dataset.attribute, event.target.dataset.signature);
       setVerified(event.target.nextElementSibling, result);
     }
