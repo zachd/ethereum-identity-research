@@ -78,11 +78,14 @@ TIMESTAMPS
 add timestamp to signatures
 keep old registry entries
 
+
+
 LOOK UP 16/03/16
 pgp signing parties
 current solidity version
 other ethereum high level languages
 gitter webchat - uport demo devcon2
+
 
 
 AUTHENTICATION 23/03/16
@@ -92,3 +95,13 @@ check with IdP
 ENVELOPE
 transport system (twitter/reddit/email)
 
+
+MEETING 06/04/16
+ipfs data - store attributes with timestamps
+
+time delay restricted changes for changing public key
+time delay for recovery contacts collaborating
+
+registry contract - access control for updating records
+
+id contract - previous_public_keys - with compromised timestamp

@@ -1,9 +1,10 @@
 const Web3 = require("web3");
 require("../stylesheets/app.css");
-const wallet_hdpath = "m/44'/60'/0'/0/";
+require("semantic-ui-css/semantic.min.css");
 
 // HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 const bip39 = require("bip39");
+const wallet_hdpath = "m/44'/60'/0'/0/";
 const ethUtils = require("ethereumjs-util");
 const hdkey = require('ethereumjs-wallet/hdkey');
 const HDWalletProvider = require("truffle-hdwallet-provider");
@@ -15,7 +16,7 @@ const ipfs = ipfsapi('localhost', '5002');
 // Global settings
 const QRCODE_SIZE = "75";
 const PROVIDER = "http://localhost:8545";
-const REGISTRY_ADDRESS = "0xe84f45d399ad74b736e7f82b0623ebb1d4cc81a6";
+const REGISTRY_ADDRESS = "0x744f7e95ba91d5d37e2d17460c5c8c34d9d29501";
 
 // Contract variables
 var uuid;
@@ -41,7 +42,7 @@ var profile = {
 function getIdentity(contract_address) {
   var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
   var contract = identity_abi.at(contract_address);
-  document.getElementById("profileuuid").innerHTML = contract_address + ' (User ' + profile_index + ')';
+  elem("profileuuid").innerHTML = contract_address + ' (User ' + profile_index + ')';
   contract.getDetails.call({from: address}, function(err, result) {
     if(!hasError(err))
       showIdentity(result);
@@ -53,14 +54,14 @@ function showIdentity(result) {
   if(result[0] > 0){
     show_hide("details", "new");
     // Update profile box
-    document.getElementById("owner").innerHTML = result[0];
-    document.getElementById("ipfshash").innerHTML = result[1] || '(none)';
-    document.getElementById("recovery").innerHTML = result[2];
-    document.getElementById("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" 
+    elem("owner").innerHTML = result[0];
+    elem("ipfshash").innerHTML = result[1] || '(none)';
+    elem("recovery").innerHTML = result[2];
+    elem("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" 
       + QRCODE_SIZE + "x" + QRCODE_SIZE + "&chl=" + result[0];
-    document.getElementById("qrcode").style = "width: " + QRCODE_SIZE + "px; height:" + QRCODE_SIZE + "px";
-    document.getElementById('attributes').innerHTML = '';
-    document.getElementById('ipfs-attributes').innerHTML = '';
+    elem("qrcode").style = "width: " + QRCODE_SIZE + "px; height:" + QRCODE_SIZE + "px";
+    elem('attributes').innerHTML = '';
+    elem('ipfs-attributes').innerHTML = '';
     // Update attributes section
     if(result[1])
       getAttributes(result[1]);
@@ -80,6 +81,8 @@ function setIPFSHash(hash) {
   contracts.identity.setIPFSHash.sendTransaction(hash, {from: address}, function(err, result) {
     if(!hasError(err)) {
       log("IPFS hash updated successfully.");
+      elem("ipfshash").innerHTML = hash || '(none)';
+      getAttributes(hash);
     }
   });
 }
@@ -91,7 +94,7 @@ function getRecoveryContacts() {
   contracts.recovery.getContacts.call({from: address}, function(err, result) {
     if(!hasError(err) && result){
       for (var contact of result)
-        document.getElementById('contact-' + contact).className = "contact selected";
+        elem('contact-' + contact).className = "contact selected";
     }
   });
 }
@@ -170,7 +173,7 @@ function registerUUID(contract_address) {
 function setUUID(contract_address) {
   uuid = contract_address;
   setContract('Identity', contract_address);
-  document.getElementById('uuid').innerHTML = contract_address 
+  elem('uuid').innerHTML = contract_address 
     + ' (User ' + user_index + ')';
 }
 
@@ -210,10 +213,12 @@ function getAttributes(hash) {
       stream.on('end', function(){
         // Update attributes form
         var data = JSON.parse(file.toString());
+        elem('attributes').innerHTML = '';
+        elem('ipfs-attributes').innerHTML = '';
         for (var att in data.attributes){
           if (data.attributes.hasOwnProperty(att)){
-            addAttribute(att, data.attributes[att]);
-            addIDAttribute(att, data.attributes[att], 
+            addAttributeFormRow(att, data.attributes[att]);
+            addAttributeIDElem(att, data.attributes[att], 
               data.signatures[att].address, data.signatures[att].signature);
           }
         }
@@ -245,8 +250,8 @@ function setVerified(element, result) {
 
 
 /* ATTRIBUTE ELEMENT FUNCTIONS */
-function addAttribute(name, value){
-  var container = document.getElementById('attributes');
+function addAttributeFormRow(name, value){
+  var container = elem('attributes');
   var attribute = document.createElement('div');
   attribute.className = 'attribute';
   attribute.innerHTML =
@@ -266,8 +271,8 @@ function getAttributesFromForm() {
   return attributes;
 }
 
-function addIDAttribute(name, value, signer, signature) {
-  var ipfsattributes = document.getElementById('ipfs-attributes');
+function addAttributeIDElem(name, value, signer, signature) {
+  var ipfsattributes = elem('ipfs-attributes');
   ipfsattributes.innerHTML +=
     '<div class="ipfs-attribute">' +
       '<div><span class="ipfs-attribute-name">' + name + '</span>: ' +
@@ -345,7 +350,7 @@ function deployContract(result, contract_name, callback) {
 function showContacts() {
   for(var i = 0; i < 10; i++){
     var addr = "0x" + generateWallet(mnemonic, i).getAddress().toString("hex");
-    document.getElementById("contacts").innerHTML +=
+    elem("contacts").innerHTML +=
       '<span id="contact-' + addr + '" class="contact' + (i == parseInt(user_index) ? ' disabled' : '') + '">' +
         'User ' + i +
       '</span>';
@@ -367,7 +372,7 @@ function refreshContacts() {
 
 /* HELPER FUNCTIONS */
 function log(msg) {
-  var logger = document.getElementById("logger");
+  var logger = elem("logger");
   logger.innerHTML += '<br />' + (msg.toString().match(/error/i) ? '<span class="err">' + msg + '</span>' : msg);
   logger.scrollTop = logger.scrollHeight;
 }
@@ -376,6 +381,10 @@ function hasError(err) {
   if(err)
     log(err);
   return err;
+}
+
+function elem(id){
+  return document.getElementById(id);
 }
 
 function getUrlParameter(input) {
@@ -388,8 +397,8 @@ function getUrlParameter(input) {
 }
 
 function show_hide(show, hide){
-  document.getElementById(show).style.display = "block";
-  document.getElementById(hide).style.display = "none";
+  elem(show).style.display = "block";
+  elem(hide).style.display = "none";
 }
 
 /* KEY GENERATION FUNCTIONS */
@@ -436,24 +445,27 @@ function walletLogin(user_index, first_run) {
   // Get address balance
   web3.eth.getBalance(address, function(err, result){
     if(!hasError(err)) {
-      document.getElementById('balance').innerHTML = web3.fromWei(result, 'ether');
+      elem('balance').innerHTML = web3.fromWei(result, 'ether');
       log("User Balance: " + web3.fromWei(result, 'ether'));
     }
   });
 
   // Compile Registry and find profiles
-  compileContract('Registry', setRegistry);
+  if(!localStorage.getItem('registry_abi'))
+    compileContract('Registry', setRegistry);
+  else
+    setRegistry();
 
   // Show data on page
-  document.getElementById('address').innerHTML = address;
-  document.getElementById('mnemonic').innerHTML = mnemonic;
-  document.getElementById("user_changer").children[user_index].selected = true;
+  elem('address').innerHTML = address;
+  elem('mnemonic').innerHTML = mnemonic;
+  elem("user_changer").children[user_index].selected = true;
 }
 
 /* MAIN LOAD EVENT */
 window.addEventListener('load', function() {
   // Start logger
-  document.getElementById('logger').innerHTML = "Ethereum Identity 1.0";
+  elem('logger').innerHTML = "Ethereum Identity 1.0";
 
   // Get user and profile index
   user_index = localStorage.getItem('user_index') || "0";
@@ -461,44 +473,53 @@ window.addEventListener('load', function() {
 
   walletLogin(user_index, true);
 
-  if (window.location.pathname == '/registry/')
+  // Compile and deploy registry if not defined
+  if (REGISTRY_ADDRESS == "")
     compileContract('Registry', deployContract);
 
   // Add button event listeners
-  document.getElementById('setAttributes').addEventListener('click', function() {
-    setAttributes(document.getElementById('attributes').value);
+  elem('setAttributes').addEventListener('click', function() {
+    setAttributes(elem('attributes').value);
   });
-  document.getElementById('contacts').addEventListener('click', function() {
+  elem('contacts').addEventListener('click', function() {
     if(event.target.tagName == 'SPAN')
       event.target.className = event.target.className == 'contact' ? 'contact selected' : 'contact';
   });
-  document.getElementById('setContacts').addEventListener('click', function() {
+  elem('setContacts').addEventListener('click', function() {
     setRecoveryContacts();
   });
-  document.getElementById('addAttribute').addEventListener('click', function() {
-    addAttribute('', '');
+  elem('menu').addEventListener('click', function() {
+    var prev = elem('menu').getElementsByClassName('active')[0];
+    if(prev !== event.target){
+      prev.className = 'item';
+      event.target.className = 'active item';
+      show_hide(event.target.dataset.tab, prev.dataset.tab);
+    }
   });
-  document.getElementById('attributes').addEventListener('click', function() {
+  elem('addAttributeFormRow').addEventListener('click', function() {
+    addAttributeFormRow('', '');
+  });
+  elem('attributes').addEventListener('click', function() {
     if(event.target.tagName == 'BUTTON')
       event.target.parentElement.parentElement.removeChild(event.target.parentElement);
   });
-  document.getElementById('ipfs-attributes').addEventListener('click', function() {
+  elem('ipfs-attributes').addEventListener('click', function() {
     if(event.target.className == 'ipfs-attribute-verify'){
       var result = verifyAttribute(event.target.parentNode.dataset.attribute, event.target.dataset.signature);
       setVerified(event.target.nextElementSibling, result);
     }
   });
-  document.getElementById('user_changer').addEventListener('change', function() {
+  elem('user_changer').addEventListener('change', function() {
     // Set indexes
     user_index = event.target.value;
     profile_index = getUrlParameter('id') || user_index;
     // Hide user details
-    document.getElementById("uuid").innerHTML = "(none)";
+    elem("uuid").innerHTML = "(none)";
     // Hide profile details
     if(user_index == profile_index)
       show_hide("new", "details");
     // Reset logger
-    var logger = document.getElementById("logger");
+    var logger = elem("logger");
     logger.innerHTML = "Changing User...";
     // Login as user
     walletLogin(user_index, false);

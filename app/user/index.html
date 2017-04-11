@@ -6,52 +6,75 @@
   <script src="/app.js"></script>
 </head>
 <body>
-  <h1>Identity</h1>
-  <div class="user_select">
-    <select id="user_changer">
-      <option value="0">User 0</option>
-      <option value="1">User 1</option>
-      <option value="2">User 2</option>
-      <option value="3">User 3</option>
-      <option value="4">User 4</option>
-      <option value="5">User 5</option>
-      <option value="6">User 6</option>
-      <option value="7">User 7</option>
-      <option value="8">User 8</option>
-      <option value="9">User 9</option>
-    </select>
-  </div>
-  <h4>
-    User ID: <span id="uuid">(none)</span><br />
-    Address: <span id="address">(none)</span> (Balance: <span id="balance">0</span>)<br />
-    Mnemonic: <span id="mnemonic">(none)</span>
-  </h4>
+  <div class="ui masthead segment">
+    <div class="ui container">
+      <h1>Identity</h1>
+      <div class="user_select">
+        <select id="user_changer">
+          <option value="0">User 0</option>
+          <option value="1">User 1</option>
+          <option value="2">User 2</option>
+          <option value="3">User 3</option>
+          <option value="4">User 4</option>
+          <option value="5">User 5</option>
+          <option value="6">User 6</option>
+          <option value="7">User 7</option>
+          <option value="8">User 8</option>
+          <option value="9">User 9</option>
+        </select>
+      </div>
+      <h4>
+        User ID: <span id="uuid">(none)</span><br />
+        Address: <span id="address"></span> (Balance: <span id="balance"></span>)<br />
+        Mnemonic: <span id="mnemonic"></span>
+      </h4>
 
-  <div id="details" style="display: none;" class="info_box">
-    <h3>User ID: <span id="profileuuid"> (none)</span></h4>
-    <img id="qrcode" />
-    <h4 style="padding-top: 3px;">Owner: <span id="owner"> (none)</span></h4>
-    <h4>Recovery: <span id="recovery"> (none)</span></h4>
-    <h4>IPFS Hash: <span id="ipfshash"> (none)</span></h4>
-    <br />
-    <h4>Attributes:</h4>
-    <div id="ipfs-attributes">(no data)</div>
-  </div>
-  <div id="new" class="info_box">Loading...</div>
-
-  <div style="display: none;">
-    <h2>Select Contacts</h2>
-    <div id="contacts"></div>
-    <button id="setContacts">Save Contacts</button>
+      <div id="menu" class="ui four item tabs menu">
+        <a class="active item" data-tab="profile-tab">Profile</a>
+        <a class="item" data-tab="attributes-tab">Attributes</a>
+        <a class="item" data-tab="recovery-tab">Recovery</a>
+        <a class="item" data-tab="log-tab">Log</a>
+      </div>
+    </div>
   </div>
 
-  <div style="display: none;">
-    <h1>Attributes <button id="addAttribute">&nbsp;+&nbsp;</button></h1>
-    <div id="attributes"></div>
-    <button id="setAttributes">Save Attributes</button>
+  <div id="profile-tab" class="ui tab active">
+    <div class="ui main container">
+      <div id="details" style="display: none" class="info_box">
+        <h3>User ID: <span id="profileuuid"> (none)</span></h3>
+        <img id="qrcode" />
+        <h4>Owner: <span id="owner"> (none)</span><br />
+          Recovery: <span id="recovery"> (none)</span><br />
+          IPFS Hash: <span id="ipfshash"> (none)</span><br />
+          <br />
+          Attributes:
+        </h4>
+        <div id="ipfs-attributes">(no data)</div>
+      </div>
+      <div id="new" class="info_box">Loading...</div>
+    </div>
+  </div>
+  <div id="attributes-tab" class="ui tab">
+    <div class="ui main container">
+      <h1>Attributes <button id="addAttributeFormRow">&nbsp;+&nbsp;</button></h1>
+      <div id="attributes"></div>
+      <button id="setAttributes">Save Attributes</button>
+    </div>
   </div>
 
-  <h1>Log</h1>
-  <div id="logger"></div>
+  <div id="recovery-tab" class="ui tab">
+    <div class="ui main container">
+      <h2>Select Contacts</h2>
+      <div id="contacts"></div>
+      <button id="setContacts">Save Contacts</button>
+    </div>
+  </div>
+
+  <div id="log-tab" class="ui tab">
+    <div class="ui main container">
+      <h1>Log</h1>
+      <div id="logger"></div>
+    </div>
+  </div>
 </body>
 </html>
