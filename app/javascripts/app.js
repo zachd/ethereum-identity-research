@@ -1,5 +1,7 @@
 const Web3 = require("web3");
+const swal = require('sweetalert2');
 require("../stylesheets/app.css");
+require("sweetalert2/dist/sweetalert2.min.css");
 require("semantic-ui-css/semantic.min.css");
 
 // HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
@@ -16,7 +18,7 @@ const ipfs = ipfsapi('localhost', '5002');
 // Global settings
 const QRCODE_SIZE = "75";
 const PROVIDER = "http://localhost:8545";
-const REGISTRY_ADDRESS = "0x744f7e95ba91d5d37e2d17460c5c8c34d9d29501";
+const REGISTRY_ADDRESS = "0x5a7533b8b41517b9b7301d06ccbbb2a2d51996af";
 
 // Contract variables
 var uuid;
@@ -49,10 +51,8 @@ function getIdentity(contract_address) {
   });
 }
 
-// Show details in identity section
 function showIdentity(result) {
   if(result[0] > 0){
-    show_hide("details", "new");
     // Update profile box
     elem("owner").innerHTML = result[0];
     elem("ipfshash").innerHTML = result[1] || '(none)';
@@ -72,8 +72,7 @@ function showIdentity(result) {
         getRecoveryContacts();
       }
     }
-  } else
-    show_hide("new", "details");
+  }
 }
 
 function setIPFSHash(hash) {
@@ -177,6 +176,25 @@ function setUUID(contract_address) {
     + ' (User ' + user_index + ')';
 }
 
+/* POPUP FUNCTIONS */
+function showSigningPopup(elem) {
+  var inputs = elem.getElementsByTagName('input');
+  var json = getSigningJson(inputs[0].value, inputs[1].value);
+  showQRPopup('Request Attestation', json);
+}
+
+function showQRPopup(title, json) {
+  swal({
+    title: title,
+    html:
+      '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' + 
+      encodeURI(JSON.stringify(json)) + '"><br />' +
+      '<div class="ui form"><div class="field"><textarea rows="6">' +
+      JSON.stringify(json, null, 2) +
+      '</textarea></div></div>',
+    showCloseButton: true
+  });
+}
 
 
 /* ATTRIBUTE SETTING FUNCTIONS */
@@ -242,6 +260,15 @@ function verifyAttribute(attribute, RPCsig) {
   return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
 }
 
+function getSigningJson(key, value) {
+  var result = {};
+  result.action = "sign";
+  result.owner = uuid;
+  result.key = key;
+  result.value = value;
+  return result;
+}
+
 function setVerified(element, result) {
   var textresult = result ? 'Verified' : 'Unverified';
   element.className = textresult.toLowerCase();
@@ -257,7 +284,8 @@ function addAttributeFormRow(name, value){
   attribute.innerHTML =
     '<div class="fields"><span class="three field"><input type="text" value="' + name + '"></span>' +
     '<span class="three field"><input type="text" value="' + value + '"></span>' +
-    '<span class="one field"><i class="ui icon remove circle red large"></i></span></div>';
+    '<span class="one field"><button class="ui button primary" data-action="sign">Request Attestation</button></span>' +
+    '<span class="one field"><button class="ui button negative" data-action="delete">Delete</button></span></div>';
   container.appendChild(attribute);
 }
 
@@ -467,10 +495,16 @@ window.addEventListener('load', function() {
   // Start logger
   elem('logger').innerHTML = "Ethereum Identity 1.0";
 
+  // Set sweetalert defaults
+  swal.setDefaults({
+    reverseButtons: true
+  });
+
   // Get user and profile index
   user_index = localStorage.getItem('user_index') || "0";
   profile_index = getUrlParameter('id') || user_index;
 
+  // Login to wallet
   walletLogin(user_index, true);
 
   // Compile and deploy registry if not defined
@@ -501,8 +535,18 @@ window.addEventListener('load', function() {
   });
   elem('attributes').addEventListener('click', function() {
     var attr = event.target.parentElement.parentElement;
-    if(event.target.tagName == 'I')
-      attr.parentElement.removeChild(attr);
+    if(event.target.dataset.action == 'sign')
+      showSigningPopup(attr);
+    if(event.target.dataset.action == 'delete')
+      swal({
+        title: "Confirm Delete",
+        text: "Are you sure you want to delete this attribute?",
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'No',
+        showCancelButton: true
+      }).then(function() {
+          attr.parentElement.removeChild(attr);
+      });
   });
   elem('ipfs-attributes').addEventListener('click', function() {
     if(event.target.id == 'ipfs-attr-verify'){
@@ -516,9 +560,6 @@ window.addEventListener('load', function() {
     profile_index = getUrlParameter('id') || user_index;
     // Hide user details
     elem("uuid").innerHTML = "(none)";
-    // Hide profile details
-    if(user_index == profile_index)
-      show_hide("new", "details");
     // Reset logger
     var logger = elem("logger");
     logger.innerHTML = "Changing User...";

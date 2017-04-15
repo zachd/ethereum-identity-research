@@ -6,7 +6,7 @@
   <script src="/app.js"></script>
 </head>
 <body>
-  <div class="ui masthead segment">
+  <div class="ui segment">
     <div class="ui container">
       <h1>Identity</h1>
       <div class="user_select">
@@ -40,7 +40,7 @@
 
   <div id="profile-tab" class="ui tab active">
     <div class="ui main container">
-      <div id="details" style="display: none">
+      <div id="details">
         <h3>User ID: <span id="profileuuid"> (none)</span></h3>
         <img id="qrcode" />
         <h4>Owner: <span id="owner"> (none)</span><br />
@@ -51,7 +51,6 @@
         </h4>
         <div id="ipfs-attributes">(no data)</div>
       </div>
-      <div id="new"><h3>Loading...</h3></div>
     </div>
   </div>
   <div id="attributes-tab" class="ui tab">

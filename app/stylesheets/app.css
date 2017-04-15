@@ -32,6 +32,10 @@
 }
 
 /* LOGGER */
+textarea {
+  font-size: 0.85em !important;
+  font-family: "Courier New", Courier, monospace !important;
+}
 #logger {
   font-family: "Courier New", Courier, monospace;
   font-size: 13px;
