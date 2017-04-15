@@ -6,23 +6,9 @@
   <script src="/app.js"></script>
 </head>
 <body>
-  <div class="ui masthead segment">
+  <div class="ui segment">
     <div class="ui container">
       <h1>Identity</h1>
-      <div class="user_select">
-        <select id="user_changer" class="ui fluid dropdown">
-          <option value="0">User 0</option>
-          <option value="1">User 1</option>
-          <option value="2">User 2</option>
-          <option value="3">User 3</option>
-          <option value="4">User 4</option>
-          <option value="5">User 5</option>
-          <option value="6">User 6</option>
-          <option value="7">User 7</option>
-          <option value="8">User 8</option>
-          <option value="9">User 9</option>
-        </select>
-      </div>
       <h4>
         User ID: <span id="uuid">(none)</span><br />
         Address: <span id="address"></span> (Balance: <span id="balance"></span>)<br />
@@ -40,7 +26,7 @@
 
   <div id="profile-tab" class="ui tab active">
     <div class="ui main container">
-      <div id="details" style="display: none">
+      <div id="details">
         <h3>User ID: <span id="profileuuid"> (none)</span></h3>
         <img id="qrcode" />
         <h4>Owner: <span id="owner"> (none)</span><br />
@@ -51,7 +37,6 @@
         </h4>
         <div id="ipfs-attributes">(no data)</div>
       </div>
-      <div id="new"><h3>Loading...</h3></div>
     </div>
   </div>
   <div id="attributes-tab" class="ui tab">

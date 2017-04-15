@@ -487,7 +487,6 @@ function walletLogin(user_index, first_run) {
   // Show data on page
   elem('address').innerHTML = address;
   elem('mnemonic').innerHTML = mnemonic;
-  elem("user_changer").children[user_index].selected = true;
 }
 
 /* MAIN LOAD EVENT */
@@ -554,7 +553,7 @@ window.addEventListener('load', function() {
       setVerified(event.target.nextElementSibling, result);
     }
   });
-  elem('user_changer').addEventListener('change', function() {
+  /*elem('user_changer').addEventListener('change', function() {
     // Set indexes
     user_index = event.target.value;
     profile_index = getUrlParameter('id') || user_index;
@@ -565,7 +564,7 @@ window.addEventListener('load', function() {
     logger.innerHTML = "Changing User...";
     // Login as user
     walletLogin(user_index, false);
-  });
+  });*/
 
   // Show contacts on page
   showContacts();
