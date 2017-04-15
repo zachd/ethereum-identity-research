@@ -13,12 +13,13 @@ const HDWalletProvider = require("truffle-hdwallet-provider");
 
 // Include IPFS
 const ipfsapi = require('ipfs-api');
-const ipfs = ipfsapi('localhost', '5002');
+const ipfs = ipfsapi(window.location.hostname, '5002');
 
 // Global settings
 const QRCODE_SIZE = "75";
-const PROVIDER = "http://localhost:8545";
+const PROVIDER = 'http://' + window.location.hostname + ':8545';
 const REGISTRY_ADDRESS = "0x5a7533b8b41517b9b7301d06ccbbb2a2d51996af";
+const DEFAULT_MNEMONIC = "palace blind basic business first term share tonight orphan unhappy hurdle unable";
 
 // Contract variables
 var uuid;
@@ -183,13 +184,29 @@ function showSigningPopup(elem) {
   showQRPopup('Request Attestation', json);
 }
 
+function getQRCodeResult() {
+  var code = getUrlParameter('code');
+  if (code) {
+    var parsed = JSON.parse(decodeURIComponent(code));
+    swal({
+      title: "QR Code",
+      html: 'Here is the code:' +
+        '<div class="ui form"><div class="field"><textarea rows="8">' +
+        JSON.stringify(parsed, null, 2) +
+        '</textarea></div></div>',
+      confirmButtonText: 'Sweet'
+    });
+  }
+}
+
+
 function showQRPopup(title, json) {
   swal({
     title: title,
     html:
       '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' + 
       encodeURI(JSON.stringify(json)) + '"><br />' +
-      '<div class="ui form"><div class="field"><textarea rows="6">' +
+      '<div class="ui form"><div class="field"><textarea rows="8">' +
       JSON.stringify(json, null, 2) +
       '</textarea></div></div>',
     showCloseButton: true
@@ -305,7 +322,7 @@ function addAttributeIDElem(name, value, signer, signature) {
     '<div class="ipfs-attribute">' +
       '<div><span class="ipfs-attribute-name">' + name + '</span>: ' +
       '<span class="ipfs-attribute-value">' + value + '</span></div>' +
-      '<div>Signed by: <span class="ipfs-attribute-signer">' + signer + '</span></div>' +
+      '<div>Signed by: <span class="ipfs-attribute-signer overflow-ellipsis">' + signer + '</span></div>' +
       '<div class="ipfs-attribute-buttons" data-attribute="' + name + ':' + value + '">' +
         '<button id="ipfs-attr-sign" class="mini ui basic grey button">Sign</button>' +
         '<button id="ipfs-attr-verify" class="mini ui basic grey button" data-signature="' + signature + '">Verify</button>' +
@@ -452,7 +469,7 @@ function walletLogin(user_index, first_run) {
   }
 
   // Generate Wallet
-  mnemonic = localStorage.getItem('mnemonic') || generateMnemonic();
+  mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
   wallet = generateWallet(mnemonic, user_index);
   address = "0x" + wallet.getAddress().toString("hex");
   profile_address = "0x" + generateWallet(mnemonic, profile_index).getAddress().toString("hex");
@@ -493,6 +510,9 @@ function walletLogin(user_index, first_run) {
 window.addEventListener('load', function() {
   // Start logger
   elem('logger').innerHTML = "Ethereum Identity 1.0";
+  elem('scanner').href = "zxing://scan/?ret=" + 
+  encodeURIComponent(location.protocol + '//' + location.host 
+    + location.pathname + "?code={CODE}");
 
   // Set sweetalert defaults
   swal.setDefaults({
@@ -505,6 +525,9 @@ window.addEventListener('load', function() {
 
   // Login to wallet
   walletLogin(user_index, true);
+
+  // Check for incoming code
+  getQRCodeResult();
 
   // Compile and deploy registry if not defined
   if (REGISTRY_ADDRESS == "")
@@ -523,7 +546,7 @@ window.addEventListener('load', function() {
   });
   elem('menu').addEventListener('click', function() {
     var prev = elem('menu').getElementsByClassName('active')[0];
-    if(prev !== event.target){
+    if(event.target.tagName == 'A' && prev !== event.target){
       prev.className = 'item';
       event.target.className = 'active item';
       show_hide(event.target.dataset.tab, prev.dataset.tab);
@@ -567,5 +590,5 @@ window.addEventListener('load', function() {
   });*/
 
   // Show contacts on page
-  showContacts();
+  //showContacts();
 });

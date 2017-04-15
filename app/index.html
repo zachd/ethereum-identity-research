@@ -2,19 +2,20 @@
 <html>
 <head>
   <title>Identity - Truffle App</title>
-  <link href="/app.css" rel='stylesheet' type='text/css'>
   <script src="/app.js"></script>
+  <link href="/app.css" rel='stylesheet' type='text/css'>
+  <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
 </head>
 <body>
   <div class="ui segment">
     <div class="ui container">
+      <a id="scanner"><button class="ui right floated button">Open Scanner</button></a>
       <h1>Identity</h1>
-      <h4>
+      <h4 class="overflow-ellipsis">
         User ID: <span id="uuid">(none)</span><br />
         Address: <span id="address"></span> (Balance: <span id="balance"></span>)<br />
         Mnemonic: <span id="mnemonic"></span>
       </h4>
-
       <div id="menu" class="ui four item tabs menu">
         <a class="active item" data-tab="profile-tab">Profile</a>
         <a class="item" data-tab="attributes-tab">Attributes</a>
@@ -27,13 +28,11 @@
   <div id="profile-tab" class="ui tab active">
     <div class="ui main container">
       <div id="details">
-        <h3>User ID: <span id="profileuuid"> (none)</span></h3>
+        <h3 class="overflow-ellipsis">User ID: <span id="profileuuid"> (none)</span></h3>
         <img id="qrcode" />
-        <h4>Owner: <span id="owner"> (none)</span><br />
+        <h4 class="overflow-ellipsis">Owner: <span id="owner"> (none)</span><br />
           Recovery: <span id="recovery"> (none)</span><br />
           IPFS Hash: <span id="ipfshash"> (none)</span><br />
-          <br />
-          Attributes:
         </h4>
         <div id="ipfs-attributes">(no data)</div>
       </div>

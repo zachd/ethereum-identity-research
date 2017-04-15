@@ -31,7 +31,7 @@
   },
   "scripts": {
     "build": "./node_modules/.bin/webpack",
-    "dev": "./node_modules/.bin/webpack-dev-server --hot"
+    "dev": "./node_modules/.bin/webpack-dev-server --hot --host 0.0.0.0"
   },
   "author": "zachd",
   "license": "ISC",

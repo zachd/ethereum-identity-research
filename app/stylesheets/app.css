@@ -11,11 +11,13 @@
 }
 .ipfs-attribute-signer {
   width: 150px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.overflow-ellipsis {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  display: inline-block;
-  vertical-align: middle;
 }
 .unverified {
   color: #D50F25;
