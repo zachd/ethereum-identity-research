@@ -18,8 +18,8 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 // Global settings
 const QRCODE_SIZE = "75";
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const REGISTRY_ADDRESS = "0x5a7533b8b41517b9b7301d06ccbbb2a2d51996af";
-const DEFAULT_MNEMONIC = "palace blind basic business first term share tonight orphan unhappy hurdle unable";
+const REGISTRY_ADDRESS = "0x5f85ac1164d6edca043e9d632e58aedefde2a5f9";
+const DEFAULT_MNEMONIC = "phrase inch club turkey extra spot mimic shove balance veteran stand shallow";
 
 // Contract variables
 var uuid;
@@ -28,11 +28,9 @@ var contracts = {}
 
 // Wallet variables
 var user_index;
-var profile_index;
 var mnemonic;
 var wallet;
 var address;
-var profile_address;
 
 // JSON profile
 var profile = {
@@ -45,7 +43,7 @@ var profile = {
 function getIdentity(contract_address) {
   var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
   var contract = identity_abi.at(contract_address);
-  elem("profileuuid").innerHTML = contract_address + ' (User ' + profile_index + ')';
+  elem("profileuuid").innerHTML = contract_address + ' (User ' + user_index + ')';
   contract.getDetails.call({from: address}, function(err, result) {
     if(!hasError(err))
       showIdentity(result);
@@ -67,11 +65,9 @@ function showIdentity(result) {
     if(result[1])
       getAttributes(result[1]);
     // Update recovery contacts
-    if(user_index == profile_index){
-      if(result[2]){
-        setContract('Recovery', result[2]);
-        getRecoveryContacts();
-      }
+    if(result[2]){
+      setContract('Recovery', result[2]);
+      getRecoveryContacts();
     }
   }
 }
@@ -122,7 +118,6 @@ function compileContracts() {
 
 function checkUsers(contract_result) {
   findUUID(address, showUser, registerUser, contract_result);
-  findUUID(profile_address, showProfile, profileNotFound);
 }
 
 function findUUID(key, found, not_found, contract_result) {
@@ -139,6 +134,7 @@ function findUUID(key, found, not_found, contract_result) {
 
 function showUser(contract_address) {
   setUUID(contract_address);
+  getIdentity(contract_address);
 }
 
 function registerUser(contract_address, contract_result) {
@@ -146,14 +142,6 @@ function registerUser(contract_address, contract_result) {
     deployContract(contract_result, "Identity", registerUUID);
   else
     compileContract("Identity", deployContract, registerUUID);
-}
-
-function showProfile(contract_address) {
-  getIdentity(contract_address);
-}
-
-function profileNotFound(contract_address) {
-  log("Error: Profile not found.");
 }
 
 function registerUUID(contract_address) {
@@ -166,8 +154,7 @@ function registerUUID(contract_address) {
     }
   });
 
-  if(user_index == profile_index)
-    getIdentity(contract_address);
+  getIdentity(contract_address);
 }
 
 function setUUID(contract_address) {
@@ -423,8 +410,10 @@ function log(msg) {
 }
 
 function hasError(err) {
-  if(err)
+  if(err){
     log(err);
+    console.log(err);
+  }
   return err;
 }
 
@@ -472,7 +461,6 @@ function walletLogin(user_index, first_run) {
   mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
   wallet = generateWallet(mnemonic, user_index);
   address = "0x" + wallet.getAddress().toString("hex");
-  profile_address = "0x" + generateWallet(mnemonic, profile_index).getAddress().toString("hex");
 
   log("User Address: " + address);
   log("Mnemonic: " + mnemonic);
@@ -495,11 +483,16 @@ function walletLogin(user_index, first_run) {
     }
   });
 
-  // Compile Registry and find profiles
-  if(!localStorage.getItem('registry_abi'))
-    compileContract('Registry', setRegistry);
-  else
-    setRegistry();
+  // Compile and deploy registry if not defined
+  if (REGISTRY_ADDRESS == "")
+    compileContract('Registry', deployContract);
+  else {
+    // Compile Registry and find profile
+    if(!localStorage.getItem('registry_abi'))
+      compileContract('Registry', setRegistry);
+    else
+      setRegistry();
+  }
 
   // Show data on page
   elem('address').innerHTML = address;
@@ -519,19 +512,14 @@ window.addEventListener('load', function() {
     reverseButtons: true
   });
 
-  // Get user and profile index
+  // Get user index
   user_index = localStorage.getItem('user_index') || "0";
-  profile_index = getUrlParameter('id') || user_index;
 
   // Login to wallet
   walletLogin(user_index, true);
 
   // Check for incoming code
   getQRCodeResult();
-
-  // Compile and deploy registry if not defined
-  if (REGISTRY_ADDRESS == "")
-    compileContract('Registry', deployContract);
 
   // Add button event listeners
   elem('setAttributes').addEventListener('click', function() {
@@ -579,7 +567,6 @@ window.addEventListener('load', function() {
   /*elem('user_changer').addEventListener('change', function() {
     // Set indexes
     user_index = event.target.value;
-    profile_index = getUrlParameter('id') || user_index;
     // Hide user details
     elem("uuid").innerHTML = "(none)";
     // Reset logger
