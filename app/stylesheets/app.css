@@ -14,10 +14,13 @@
   display: inline-block;
   vertical-align: middle;
 }
-.overflow-ellipsis {
+.swal2-content, .overflow-ellipsis {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.lh-two {
+  line-height: 2em;
 }
 .unverified {
   color: #D50F25;

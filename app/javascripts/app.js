@@ -165,25 +165,42 @@ function setUUID(contract_address) {
 }
 
 /* POPUP FUNCTIONS */
-function showSigningPopup(elem) {
+function showRequestAttestationPopup(elem) {
   var inputs = elem.getElementsByTagName('input');
   var json = getSigningJson(inputs[0].value, inputs[1].value);
   showQRPopup('Request Attestation', json);
 }
 
-function getQRCodeResult() {
-  var code = getUrlParameter('code');
-  if (code) {
-    var parsed = JSON.parse(decodeURIComponent(code));
+function getQRCodeResult(code) {
+  var parsed = JSON.parse(decodeURIComponent(code));
+  var action = parsed['action'];
+  if(action === "sign"){
     swal({
-      title: "QR Code",
-      html: 'Here is the code:' +
-        '<div class="ui form"><div class="field"><textarea rows="8">' +
-        JSON.stringify(parsed, null, 2) +
-        '</textarea></div></div>',
-      confirmButtonText: 'Sweet'
+      title: "Signature Request",
+      html: 'User: <strong>' + parsed['owner'] + '</strong><br /><br />' +
+        '<div class="ui form">' + 
+        '<div class="inline field"><label>Attribute</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
+        '<div class="inline field"><label>Value</label><input type="text" value="' + parsed.value + '" disabled /></div>' +
+        '</div>',
+      cancelButtonText: 'Cancel',
+      showCancelButton: true,
+      confirmButtonText: '<i class="ui icon checkmark"></i> Sign'
+    }).then(function() {
+      showSigningResultPopup(parsed);
     });
   }
+}
+
+function showSigningResultPopup(input) {
+  delete input.action;
+  input.signer = uuid;
+  var signature = signAttribute(JSON.stringify(input));
+  var result = {
+    action: 'save', signer: uuid, 
+    key: input.key, value: input.value,
+    signature: signature
+  };
+  showQRPopup('Signature Result', result);
 }
 
 
@@ -202,7 +219,7 @@ function showQRPopup(title, json) {
 
 
 /* ATTRIBUTE SETTING FUNCTIONS */
-function setAttributes(input) {
+function setAttributes() {
   var attributes = getAttributesFromForm();
   var signatures = {};
   log("Signing attributes...");
@@ -284,12 +301,17 @@ function setVerified(element, result) {
 function addAttributeFormRow(name, value){
   var container = elem('attributes');
   var attribute = document.createElement('div');
-  attribute.className = 'attribute';
+  attribute.className = 'card attribute';
   attribute.innerHTML =
-    '<div class="fields"><span class="three field"><input type="text" value="' + name + '"></span>' +
-    '<span class="three field"><input type="text" value="' + value + '"></span>' +
-    '<span class="one field"><button class="ui button primary" data-action="sign">Request Attestation</button></span>' +
-    '<span class="one field"><button class="ui button negative" data-action="delete">Delete</button></span></div>';
+    '<div class="content">' +
+      '<i class="right floated delete icon red" data-action="delete"></i>' +
+      '<div class="inline field"><input type="text" value="' + name + '"></div>' +
+      '<div class="description"><input type="text" value="' + value + '"></div>' +
+    '</div>' +
+    '<div class="extra content">' +
+      '<span class="left floated lh-two"><span class="num-attestations">0</span> Attestations</span>' +
+      '<span class="right floated"><button class="ui button primary mini" data-action="sign">Request Attestation</button></span>' +
+    '</div>';
   container.appendChild(attribute);
 }
 
@@ -515,15 +537,18 @@ window.addEventListener('load', function() {
   // Get user index
   user_index = localStorage.getItem('user_index') || "0";
 
+  // Check for incoming code
+  var code = getUrlParameter('code');
+  if (code) {
+    getQRCodeResult(code);
+  }
+
   // Login to wallet
   walletLogin(user_index, true);
 
-  // Check for incoming code
-  getQRCodeResult();
-
   // Add button event listeners
   elem('setAttributes').addEventListener('click', function() {
-    setAttributes(elem('attributes').value);
+    setAttributes();
   });
   elem('contacts').addEventListener('click', function() {
     if(event.target.tagName == 'SPAN')
@@ -546,7 +571,7 @@ window.addEventListener('load', function() {
   elem('attributes').addEventListener('click', function() {
     var attr = event.target.parentElement.parentElement;
     if(event.target.dataset.action == 'sign')
-      showSigningPopup(attr);
+      showRequestAttestationPopup(attr.parentElement);
     if(event.target.dataset.action == 'delete')
       swal({
         title: "Confirm Delete",
