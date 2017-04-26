@@ -16,10 +16,10 @@ const ipfsapi = require('ipfs-api');
 const ipfs = ipfsapi(window.location.hostname, '5002');
 
 // Global settings
-const QRCODE_SIZE = "75";
+const QRCODE_SIZE = "100";
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const REGISTRY_ADDRESS = "0x6e002390d8af081aa4e91fae232758eda75fd326";
-const DEFAULT_MNEMONIC = "gospel work autumn bar burst add position input devote dawn conduct rocket";
+const REGISTRY_ADDRESS = "0xf12c7360d389b9fba03ad3d3cdac3ee6374a2167";
+const DEFAULT_MNEMONIC = "example believe spike cable approve business danger opera open legal silent soft";
 
 // Contract variables
 var uuid;
@@ -57,7 +57,9 @@ function showIdentity(result) {
     elem("ipfshash").innerHTML = result[1] || '(none)';
     elem("recovery").innerHTML = result[2];
     elem("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" 
-      + QRCODE_SIZE + "x" + QRCODE_SIZE + "&chl=" + result[0];
+      + QRCODE_SIZE + "x" + QRCODE_SIZE + "&chl=" + encodeURIComponent(JSON.stringify(
+      {'action': 'contact', 'uuid': result[0]}
+    ));
     elem("qrcode").style = "width: " + QRCODE_SIZE + "px; height:" + QRCODE_SIZE + "px";
     elem('attributes').innerHTML = '';
     elem('ipfs-attributes').innerHTML = '';
@@ -86,22 +88,26 @@ function setIPFSHash(hash) {
 
 /* RECOVERY FUNCTIONS */
 function getRecoveryContacts() {
-  refreshContacts();
   contracts.recovery.getContacts.call({from: address}, function(err, result) {
     if(!hasError(err) && result){
-      for (var contact of result)
-        elem('contact-' + contact).className = "contact selected";
+      elem("contacts").innerHTML = '';
+      for (var addr of result)
+        showContact(addr)
     }
   });
 }
 
 function setRecoveryContacts() {
-  var contacts = getContacts();
+  var contacts = getContactElements();
   log("Updating contacts in recovery profile...");
   contracts.identity.setContacts.sendTransaction(contacts, {from: address}, function(err, result) {
     if(!hasError(err)) {
       log("Recovery contacts updated successfully.");
-      getRecoveryContacts();
+      swal({
+        title: "Contacts Updated",
+        type: 'success',
+        text: 'Contacts updated successfully.'
+      });
     }
   });
 }
@@ -169,11 +175,11 @@ function showRequestAttestationPopup(elem) {
 
 function getQRCodeResult(code) {
   var parsed = JSON.parse(decodeURIComponent(code).replace('+', ' '));
-  var action = parsed['action'];
+  var action = parsed.action;
   if(action === "sign"){
     swal({
       title: "Signature Request",
-      html: 'User: <strong>' + parsed['owner'] + '</strong><br /><br />' +
+      html: 'User: <strong>' + parsed.owner + '</strong><br /><br />' +
         '<div class="ui form">' + 
         '<div class="inline field"><label>Attribute</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
         '<div class="inline field"><label>Value</label><input type="text" value="' + parsed.value + '" disabled /></div>' +
@@ -194,21 +200,15 @@ function getQRCodeResult(code) {
         added = true;
       }
     }
-    if(added) {
+    if(added)
       setAttributes();
-      swal({
-        title: "Signature Saved",
-        type: 'success',
-        text: 'The signature was saved successfully.'
-      });
-    } else {
-      swal({
-        title: "Operation Failed",
-        type: 'error',
-        text: 'There was a problem saving that signature.'
-      });
-    }
-    window.history.pushState({} , '', window.location.origin);
+    else
+      hasError('Error: Attribute does not exist on profile');
+    resetUrl();
+  } else if (action === "contact") {
+    showContact(parsed.uuid);
+    setRecoveryContacts();
+    resetUrl();
   }
 }
 
@@ -251,6 +251,11 @@ function setAttributes() {
       log("Attributes saved successfully.");
       var hash = result[0].hash;
       setIPFSHash(hash);
+      swal({
+        title: "Attributes Saved",
+        type: 'success',
+        text: 'Attributes saved successfully.'
+      });
     }
   });
 }
@@ -445,26 +450,15 @@ function deployContract(result, contract_name, callback) {
 
 
 /* CONTACTS ELEMENT FUNCTIONS */
-function showContacts() {
-  for (var i = 0; i < 10; i++){
-    var addr = "0x" + generateWallet(mnemonic, i).getAddress().toString("hex");
-    elem("contacts").innerHTML +=
-      '<span id="contact-' + addr + '" class="contact' + (i == parseInt(user_index) ? ' disabled' : '') + '">' +
-        'User ' + i +
-      '</span>';
-  }
+function showContact(addr) {
+  elem("contacts").innerHTML +=
+    '<span id="contact-' + addr + '" class="contact">' + addr + '</span>';
 }
 
-function getContacts() {
-  var contacts = document.getElementsByClassName('contact selected');
+function getContactElements() {
+  var contacts = document.getElementsByClassName('contact');
   var contacts_arr = [].slice.call(contacts);
   return contacts_arr.map(function(elem) { return elem.id.substr(8); });
-}
-
-function refreshContacts() {
-  var contacts = document.getElementsByClassName('contact');
-  for (var contact of contacts)
-    contact.className = 'contact';
 }
 
 
@@ -479,12 +473,21 @@ function hasError(err) {
   if(err){
     log(err);
     console.log(err);
+    swal({
+      title: "Operation Failed",
+      type: 'error',
+      html: 'There was a problem performing that action: <br />' + err
+    });
   }
   return err;
 }
 
 function elem(id){
   return document.getElementById(id);
+}
+
+function resetUrl() {
+  window.history.pushState({} , '', window.location.origin);
 }
 
 function getUrlParameter(input) {
@@ -638,18 +641,5 @@ window.addEventListener('load', function() {
       setVerified(event.target.nextElementSibling, result);
     }
   });
-  /*elem('user_changer').addEventListener('change', function(event) {
-    // Set indexes
-    user_index = event.target.value;
-    // Hide user details
-    elem("uuid").innerHTML = "(none)";
-    // Reset logger
-    var logger = elem("logger");
-    logger.innerHTML = "Changing User...";
-    // Login as user
-    walletLogin(user_index, false);
-  });*/
-
-  // Show contacts on page
-  //showContacts();
+  getRecoveryContacts();
 });
