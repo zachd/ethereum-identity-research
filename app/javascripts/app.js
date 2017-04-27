@@ -1,5 +1,6 @@
 const Web3 = require("web3");
 const swal = require('sweetalert2');
+var qrcode = require('jsqrcode');
 require("../stylesheets/app.css");
 require("sweetalert2/dist/sweetalert2.min.css");
 require("semantic-ui-css/semantic.min.css");
@@ -18,8 +19,8 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 // Global settings
 const QRCODE_SIZE = "100";
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const REGISTRY_ADDRESS = "0xf12c7360d389b9fba03ad3d3cdac3ee6374a2167";
-const DEFAULT_MNEMONIC = "example believe spike cable approve business danger opera open legal silent soft";
+const REGISTRY_ADDRESS = "0x34d6b890f5677b3a2b45c66e3655709f1c1c5ff7";
+const DEFAULT_MNEMONIC = "mammal stand weasel cricket fortune share east desk earn salt raw water";
 
 // Contract variables
 var uuid;
@@ -31,6 +32,7 @@ var user_index;
 var mnemonic;
 var wallet;
 var address;
+var stopScan;
 
 // JSON profile
 var profile = {
@@ -92,7 +94,7 @@ function getRecoveryContacts() {
     if(!hasError(err) && result){
       elem("contacts").innerHTML = '';
       for (var addr of result)
-        showContact(addr)
+        addContact(addr)
     }
   });
 }
@@ -174,8 +176,12 @@ function showRequestAttestationPopup(elem) {
 }
 
 function getQRCodeResult(code) {
-  var parsed = JSON.parse(decodeURIComponent(code).replace('+', ' '));
-  var action = parsed.action;
+  var parsed;
+  var action;
+  try {
+    parsed = JSON.parse(decodeURIComponent(code).replace('+', ' '));
+    action = parsed.action;
+  } catch(e) {}
   if(action === "sign"){
     swal({
       title: "Signature Request",
@@ -206,9 +212,11 @@ function getQRCodeResult(code) {
       hasError('Error: Attribute does not exist on profile');
     resetUrl();
   } else if (action === "contact") {
-    showContact(parsed.uuid);
+    addContact(parsed.uuid);
     setRecoveryContacts();
     resetUrl();
+  } else {
+    hasError("Invalid QR code.")
   }
 }
 
@@ -236,6 +244,56 @@ function showQRPopup(title, json) {
       '</textarea></div></div>',
     showCloseButton: true
   });
+}
+
+function showDesktopQR() {
+  swal({
+    title: 'Scanner',
+    html: '<video id="desktop-scanner" style="width: 460px;height: 345px;"></video><br />' +
+    '<canvas id="qr-canvas" style="display: none"></canvas>',
+    showCloseButton: true
+  }).then(
+    function () {},
+    function (dismiss) {
+      stopVideo();
+    }
+  );
+  if (navigator.getUserMedia) {
+    navigator.getUserMedia({video: true}, successCallback, function(e) {});
+  } else {
+    hasError("Video is not supported in this browser.");
+  }
+}
+
+function successCallback(stream) {
+  var video = elem('desktop-scanner');
+  var canvas = elem('qr-canvas');
+  video.src = (window.URL && window.URL.createObjectURL(stream)) || stream;
+  video.play();
+  window.localMediaStream = stream;
+  canvas.width = video.offsetWidth;
+  canvas.height = video.offsetHeight;
+  stopScan = setInterval(function(){ scan(); }, 200);
+}
+
+function scan() {
+  if (window.localMediaStream) {
+    var canvas = elem('qr-canvas');
+    var video = elem('desktop-scanner');
+    canvas.getContext('2d').drawImage(video, 0, 0, video.offsetWidth, video.offsetHeight);
+    try {
+      var result = qrcode().decode(canvas);
+      getQRCodeResult(result);
+      stopVideo();
+    } catch(e) {
+      // QR parsing error
+    }
+  }
+}
+
+function stopVideo() {
+  clearInterval(stopScan);
+  window.localMediaStream.getVideoTracks()[0].stop();
 }
 
 
@@ -329,7 +387,7 @@ function addAttributeFormRow(name, value, signatures){
       '<i class="right floated delete icon red" data-action="delete"></i>' +
       '<div class="inline field"><input type="text" value="' + name + '"></div>' +
       '<div class="description field"><input type="text" value="' + value + '"></div>' +
-      '<div class="signatures overflow-ellipsis verified"></div>' +
+      '<div class="signatures verified"></div>' +
     '</div>' +
     '<div class="extra content">' +
       '<span class="left floated lh-two"><span class="num-attestations">0</span> Attestations</span>' +
@@ -346,8 +404,8 @@ function addAttributeFormRow(name, value, signatures){
 
 function addSignatureToFormRow(sig, attribute) {
   attribute.getElementsByClassName('signatures')[0].innerHTML += 
-    '<span class="signature" data-signer="' + sig.signer + '" data-signature="' + sig.signature + '">' +
-    '<i class="ui icon checkmark"></i> Signed by <span class="signer ">' + sig.signer + '</span></span>';
+    '<div class="signature overflow-ellipsis" data-signer="' + sig.signer + '" data-signature="' + sig.signature + '">' +
+    '<i class="ui icon checkmark"></i> Signed by <span class="signer ">' + sig.signer + '</span></div>';
   var counter = attribute.getElementsByClassName('num-attestations')[0];
   counter.innerHTML = parseInt(counter.innerHTML) + 1;
 }
@@ -450,15 +508,20 @@ function deployContract(result, contract_name, callback) {
 
 
 /* CONTACTS ELEMENT FUNCTIONS */
-function showContact(addr) {
+function addContact(addr) {
   elem("contacts").innerHTML +=
-    '<span id="contact-' + addr + '" class="contact">' + addr + '</span>';
+    '<div class="card contact" data-uuid="' + addr + '">' +
+      '<div class="content">' +
+        '<i class="right floated delete icon red" data-action="delete"></i>' +
+        '<div class="title overflow-ellipsis">' + addr + '</div>' +
+      '</div>' +
+    '</div>';
 }
 
 function getContactElements() {
   var contacts = document.getElementsByClassName('contact');
   var contacts_arr = [].slice.call(contacts);
-  return contacts_arr.map(function(elem) { return elem.id.substr(8); });
+  return contacts_arr.map(function(elem) { return elem.dataset.uuid; });
 }
 
 
@@ -572,9 +635,17 @@ function walletLogin(user_index, first_run) {
 window.addEventListener('load', function() {
   // Start logger
   elem('logger').innerHTML = "Ethereum Identity 1.0";
-  elem('scanner').href = "zxing://scan/?ret=" + 
-  encodeURIComponent(location.protocol + '//' + location.host 
-    + location.pathname + "?code={CODE}");
+
+  // Check for mobile device http://stackoverflow.com/a/14283643
+  if(('ontouchstart' in window || 'onmsgesturechange' in window) && window.screenX === 0)
+    elem('scanner').href = "zxing://scan/?ret=" + 
+      encodeURIComponent(location.protocol + '//' + location.host 
+      + location.pathname + "?code={CODE}"
+    );
+  else
+    elem('scanner').addEventListener('click', function(event) {
+      showDesktopQR();
+    });
 
   // Set sweetalert defaults
   swal.setDefaults({
@@ -603,8 +674,17 @@ window.addEventListener('load', function() {
     setAttributes();
   });
   elem('contacts').addEventListener('click', function(event) {
-    if(event.target.tagName == 'SPAN')
-      event.target.className = event.target.className == 'contact' ? 'contact selected' : 'contact';
+    var contact = event.target.parentElement.parentElement;
+    if(event.target.dataset.action == 'delete')
+      swal({
+        title: "Confirm Delete",
+        text: "Are you sure you want to delete this contact?",
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'No',
+        showCancelButton: true
+      }).then(function() {
+          contact.parentElement.removeChild(contact);
+      });
   });
   elem('setContacts').addEventListener('click', function(event) {
     setRecoveryContacts();
@@ -641,5 +721,4 @@ window.addEventListener('load', function() {
       setVerified(event.target.nextElementSibling, result);
     }
   });
-  getRecoveryContacts();
 });

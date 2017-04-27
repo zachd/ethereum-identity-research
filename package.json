@@ -7,6 +7,8 @@
     "ethereumjs-util": "^5.1.1",
     "ethereumjs-wallet": "^0.6.0",
     "ipfs-api": "^12.1.7",
+    "jsqrcode": "0.0.7",
+    "qrcode-reader": "^0.2.2",
     "semantic-ui-css": "^2.2.10",
     "solc": "^0.4.9",
     "sweetalert2": "^6.4.3",

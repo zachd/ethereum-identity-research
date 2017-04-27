@@ -37,5 +37,8 @@ module.exports = {
     alias: {
       zlib: 'browserify-zlib-next'
     }
-  }
+  },
+  externals: [
+    'canvas'
+  ]
 };

@@ -4,10 +4,20 @@ contract Recovery {
 
     address uuid;
     address[] contacts;
+    mapping(address => address) recoveries;
+    mapping(address => uint) proposed_keys;
 
     modifier onlyUuid(){
         if (msg.sender == uuid)
             _;
+    }
+
+    modifier onlyContact(){
+        for(uint i = 0; i < contacts.length; i++)
+            if(contacts[i] == msg.sender){
+                _;
+                break;
+            }
     }
 
     function Recovery(address _uuid) {
@@ -21,6 +31,18 @@ contract Recovery {
     function getContacts() returns (address[] _contacts) {
         _contacts = contacts;
     }
+
+    function addRecovery(address _key) onlyContact {
+        if(recoveries[msg.sender] != _key && proposed_keys[recoveries[msg.sender]] == 0){
+            recoveries[msg.sender] = _key;
+            proposed_keys[_key] += 1;
+        }
+        if (proposed_keys[_key] > (contacts.length / 2)){
+            Identity identity_c = Identity(uuid);
+            proposed_keys[_key] = 0;
+            identity_c.transferOwner(_key);
+        }
+    }
 }
 
 contract Identity {
@@ -31,6 +53,11 @@ contract Identity {
 
     modifier onlyOwner(){
         if (msg.sender == owner)
+            _;
+    }
+
+    modifier onlyOwnerOrRecovery(){
+        if (msg.sender == owner || msg.sender == recovery)
             _;
     }
 
@@ -52,7 +79,12 @@ contract Identity {
         recovery_c.setContacts(_contacts);
     }
 
-    function transferOwner(address _owner) onlyOwner {
+    function addRecovery(address _key) onlyOwner {
+        Recovery recovery_c = Recovery(recovery);
+        recovery_c.addRecovery(_key);
+    }
+
+    function transferOwner(address _owner) onlyOwnerOrRecovery {
         owner = _owner;
     }
 
