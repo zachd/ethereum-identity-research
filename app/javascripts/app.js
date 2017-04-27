@@ -168,7 +168,7 @@ function setUserName() {
 function showRequestAttestationPopup(elem) {
   var inputs = elem.getElementsByTagName('input');
   var json = getSigningJson(inputs[0].value, inputs[1].value);
-  showQRPopup('Request Attestation', json);
+  showQRPopup('Request Attestation', json, true);
 }
 
 function getQRCodeResult(code) {
@@ -186,11 +186,13 @@ function getQRCodeResult(code) {
         '<div class="inline field"><label>Attribute</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
         '<div class="inline field"><label>Value</label><input type="text" value="' + parsed.value + '" disabled /></div>' +
         '</div>',
-      cancelButtonText: 'Cancel',
       showCancelButton: true,
+      cancelButtonText: 'Cancel',
       confirmButtonText: '<i class="ui icon checkmark"></i> Sign'
     }).then(function() {
       showSigningResultPopup(parsed);
+    }, function(dismiss) {
+      resetUrl();
     });
   } else if (action === "save") {
     var attributes = document.getElementsByClassName('attribute');
@@ -229,7 +231,7 @@ function showSigningResultPopup(input) {
 }
 
 
-function showQRPopup(title, json) {
+function showQRPopup(title, json, show_scanner) {
   swal({
     title: title,
     html:
@@ -238,7 +240,13 @@ function showQRPopup(title, json) {
       '<div class="ui form"><div class="field"><textarea rows="8">' +
       JSON.stringify(json, null, 2) +
       '</textarea></div></div>',
-    showCloseButton: true
+    showCancelButton: show_scanner,
+    confirmButtonText: show_scanner ? 'Open Scanner' : 'Ok',
+    allowOutsideClick: false
+  }).then(function() {
+    if(show_scanner)
+      elem('scanner').click();
+    resetUrl();
   });
 }
 
@@ -249,7 +257,9 @@ function showDesktopQR() {
     '<canvas id="qr-canvas" style="display: none"></canvas>',
     showCloseButton: true
   }).then(
-    function () {},
+    function () {
+      stopVideo();
+    },
     function (dismiss) {
       stopVideo();
     }
@@ -379,7 +389,7 @@ function setVerified(element, result) {
 
 
 /* ATTRIBUTE ELEMENT FUNCTIONS */
-function addAttributeFormRow(name, value, signatures){
+function addAttributeFormRow(name, value, signatures, empty){
   var container = elem('attributes');
   var attribute = document.createElement('div');
   attribute.className = 'card attribute';
@@ -392,7 +402,8 @@ function addAttributeFormRow(name, value, signatures){
     '</div>' +
     '<div class="extra content">' +
       '<span class="left floated lh-two"><span class="num-attestations">0</span> Attestations</span>' +
-      '<span class="right floated"><button class="ui button primary mini" data-action="sign">Request Attestation</button></span>' +
+      '<span class="right floated"><button class="ui button primary mini" data-action="sign" ' +
+      (empty ? 'disabled' : '') + '>Request Attestation</button></span>' +
     '</div>';
 
   // Add signatures
@@ -701,7 +712,7 @@ window.addEventListener('load', function() {
     }
   });
   elem('addAttributeFormRow').addEventListener('click', function(event) {
-    addAttributeFormRow('', '', []);
+    addAttributeFormRow('', '', [], true);
   });
   elem('attributes').addEventListener('click', function(event) {
     var attr = event.target.parentElement.parentElement;
