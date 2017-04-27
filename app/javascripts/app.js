@@ -18,9 +18,9 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 
 // Global settings
 const QRCODE_SIZE = "100";
+const NUM_ACCOUNTS = 100;
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const REGISTRY_ADDRESS = "0x34d6b890f5677b3a2b45c66e3655709f1c1c5ff7";
-const DEFAULT_MNEMONIC = "mammal stand weasel cricket fortune share east desk earn salt raw water";
+const DEFAULT_MNEMONIC = "large that lunar glove icon chair wall sentence bundle unfold speak foot";
 
 // Contract variables
 var uuid;
@@ -29,6 +29,8 @@ var contracts = {}
 
 // Wallet variables
 var user_index;
+var user_name;
+var user_resolve;
 var mnemonic;
 var wallet;
 var address;
@@ -114,26 +116,22 @@ function setRecoveryContacts() {
   });
 }
 
-/* REGISTRY FUNCTIONS */
+/* USER SETUP FUNCTIONS */
 function compileContracts() {
   if(!localStorage.getItem('identity_abi'))
-    compileContract('Identity', findUUID);
+    compileContract('Identity', checkForUser);
   else
-    findUUID();
+    checkForUser();
   if(!localStorage.getItem('recovery_abi'))
     compileContract('Recovery', null);
 }
 
-function findUUID(contract_result) {
-  contracts.registry.get.call(address, {from: address}, function(err, result) {
-    if(!hasError(err) && web3.toDecimal(result)){
-      log("Registry result found: " + result);
-      showUser(result, contract_result);
-    } else {
-      log("Registry result not found: " + result);
-      registerUser(result, contract_result);
-    }
-  });
+function checkForUser(contract_result) {
+  var contract_address = localStorage.getItem('identity_address');
+  if(contract_address)
+    showUser(contract_address);
+  else
+    registerUser(contract_result);
 }
 
 function showUser(contract_address) {
@@ -141,7 +139,7 @@ function showUser(contract_address) {
   getIdentity(contract_address);
 }
 
-function registerUser(contract_address, contract_result) {
+function registerUser(contract_result) {
   if(contract_result)
     deployContract(contract_result, "Identity", registerUUID);
   else
@@ -149,15 +147,8 @@ function registerUser(contract_address, contract_result) {
 }
 
 function registerUUID(contract_address) {
+  setUserName();
   setUUID(contract_address);
-
-  log("Adding UUID to Registry...");
-  contracts.registry.add.sendTransaction(address, contract_address, {from: address}, function(err, result) {
-    if(!hasError(err)) {
-      log("UUID registered successfully.");
-    }
-  });
-
   getIdentity(contract_address);
 }
 
@@ -166,6 +157,11 @@ function setUUID(contract_address) {
   setContract('Identity', contract_address);
   elem('uuid').innerHTML = contract_address 
     + ' (User ' + user_index + ')';
+}
+
+function setUserName() {
+  addAttributeFormRow('name', user_name, []);
+  setAttributes(true);
 }
 
 /* POPUP FUNCTIONS */
@@ -298,7 +294,7 @@ function stopVideo() {
 
 
 /* ATTRIBUTE SETTING FUNCTIONS */
-function setAttributes() {
+function setAttributes(is_signup) {
   var elements = getElementsFromForm();
   profile.uuid = uuid;
   profile.attributes = elements.attributes;
@@ -309,11 +305,16 @@ function setAttributes() {
       log("Attributes saved successfully.");
       var hash = result[0].hash;
       setIPFSHash(hash);
-      swal({
-        title: "Attributes Saved",
-        type: 'success',
-        text: 'Attributes saved successfully.'
-      });
+      if(is_signup){
+        user_resolve();
+        user_resolve = null;
+      }
+      else
+        swal({
+          title: "Attributes Saved",
+          type: 'success',
+          text: 'Attributes saved successfully.'
+        });
     }
   });
 }
@@ -449,11 +450,6 @@ function addAttributeIDElem(name, value, signer, signature) {
 
 
 /* CONTRACT FUNCTIONS */
-function setRegistry() {
-  setContract('Registry', REGISTRY_ADDRESS);
-  compileContracts();
-}
-
 function setContract(contract_name, contract_address) {
   var contract_obj = web3.eth.contract(JSON.parse(localStorage.getItem(contract_name.toLowerCase() + '_abi')));
   contracts[contract_name.toLowerCase()] = contract_obj.at(contract_address);
@@ -530,6 +526,8 @@ function log(msg) {
   var logger = elem("logger");
   logger.innerHTML += '<br />' + (msg.toString().match(/error/i) ? '<span class="err">' + msg + '</span>' : msg);
   logger.scrollTop = logger.scrollHeight;
+  if(user_resolve)
+    elem("signup_log").innerHTML = msg;
 }
 
 function hasError(err) {
@@ -567,6 +565,10 @@ function show_hide(show, hide){
   elem(hide).style.display = "none";
 }
 
+function getRandomId() {
+  return Math.floor(Math.random() * NUM_ACCOUNTS) + 1;
+}
+
 /* KEY GENERATION FUNCTIONS */
 function generateMnemonic() {
   return bip39.generateMnemonic();
@@ -579,7 +581,7 @@ function generateWallet(mnemonic, index) {
 
 
 /* LOGIN FUNCTION */
-function walletLogin(user_index, first_run) {
+function walletLogin(user_index) {
   log("Logging in as User " + user_index);
 
   // Reset saved state from previous user
@@ -599,7 +601,7 @@ function walletLogin(user_index, first_run) {
 
   // Supports Metamask and Mist, and other wallets that provide 'web3'
   // http://truffleframework.com/tutorials/bundling-with-webpack
-  if (first_run && typeof window.web3 !== 'undefined') {
+  if (typeof window.web3 !== 'undefined') {
     window.web3 = new Web3(web3.currentProvider);
   } else {
     var provider = new HDWalletProvider(mnemonic, PROVIDER, user_index);
@@ -611,20 +613,10 @@ function walletLogin(user_index, first_run) {
   web3.eth.getBalance(address, function(err, result){
     if(!hasError(err)) {
       elem('balance').innerHTML = web3.fromWei(result, 'ether');
-      log("User Balance: " + web3.fromWei(result, 'ether'));
     }
   });
 
-  // Compile and deploy registry if not defined
-  if (REGISTRY_ADDRESS == "")
-    compileContract('Registry', deployContract);
-  else {
-    // Compile Registry and find profile
-    if(!localStorage.getItem('registry_abi'))
-      compileContract('Registry', setRegistry);
-    else
-      setRegistry();
-  }
+  compileContracts();
 
   // Show data on page
   elem('address').innerHTML = address;
@@ -656,16 +648,25 @@ window.addEventListener('load', function() {
   user_index = localStorage.getItem('user_index');
 
   // Login to wallet
-  if(user_index){
-    walletLogin(user_index, true);
+  if(user_index && localStorage.getItem('identity_address')){
+    walletLogin(user_index);
   } else {
     swal({
-      title: "Login to User",
+      title: "Create an account",
       input: 'text',
-      confirmButtonText: 'Login'
-    }).then(function(result) {
-      user_index = result;
-      walletLogin(user_index, true);
+      html: '<div id="signup_log"></div>',
+      inputPlaceholder: 'Enter your name...',
+      confirmButtonText: 'Login',
+      showLoaderOnConfirm: true,
+      allowOutsideClick: false,
+      preConfirm: function (result) {
+        return new Promise(function (resolve, reject) {
+          user_name = result;
+          user_resolve = resolve;
+          user_index = getRandomId().toString();
+          walletLogin(user_index);
+        })
+      }
     });
   }
 
@@ -691,8 +692,10 @@ window.addEventListener('load', function() {
   });
   elem('menu').addEventListener('click', function(event) {
     var prev = elem('menu').getElementsByClassName('active')[0];
+    var logger = elem('logger');
     if(event.target.tagName == 'A' && prev !== event.target){
       prev.className = 'item';
+      logger.scrollTop = logger.scrollHeight;
       event.target.className = 'active item';
       show_hide(event.target.dataset.tab, prev.dataset.tab);
     }
