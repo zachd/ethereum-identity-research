@@ -6,7 +6,7 @@ require("sweetalert2/dist/sweetalert2.min.css");
 require("semantic-ui-css/semantic.min.css");
 
 // Contract import
-const Identity = require('../contracts/Identity.sol');
+const ContractImport = require('../contracts/Contracts.sol');
 
 // HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 const bip39 = require("bip39");
@@ -20,7 +20,6 @@ const ipfsapi = require('ipfs-api');
 const ipfs = ipfsapi(window.location.hostname, '5002');
 
 // Global settings
-const QRCODE_SIZE = "100";
 const NUM_ACCOUNTS = 100;
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
 const DEFAULT_MNEMONIC = "large that lunar glove icon chair wall sentence bundle unfold speak foot";
@@ -47,14 +46,18 @@ var profile = {
 };
 
 /* IDENTITY FUNCTIONS */
-function getIdentity(contract_address) {
-  uuid = contract_address;
-  setContract('Identity', contract_address);
-  elem('uuid').innerHTML = contract_address + ' (User ' + user_index + ')';
+function getIdentity() {
+  elem('uuid').innerHTML = uuid + ' (User ' + user_index + ')';
   elem("profileuuid").innerHTML = elem('uuid').innerHTML;
-  contracts.identity.getDetails.call({from: address}, function(err, result) {
+  fetchIdentity(uuid, showIdentity);
+}
+
+function fetchIdentity(contract_address, callback, params) {
+  var compiled = ContractImport['Contracts.sol:Identity'];
+  var contract = web3.eth.contract(compiled.abi).at(contract_address);
+  contract.getDetails.call({from: address}, function(err, result) {
     if(!hasError(err))
-      showIdentity(result);
+      callback(result, params);
   });
 }
 
@@ -65,10 +68,10 @@ function showIdentity(result) {
     elem("ipfshash").innerHTML = result[1] || '(none)';
     elem("recovery").innerHTML = result[2];
     elem("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" 
-      + QRCODE_SIZE + "x" + QRCODE_SIZE + "&chl=" + encodeURIComponent(JSON.stringify(
-      {'action': 'contact', 'uuid': result[0]}
+       + "350x350"  + "&chl=" + encodeURIComponent(JSON.stringify(
+      {'action': 'contact', 'uuid': uuid}
     ));
-    elem("qrcode").style = "width: " + QRCODE_SIZE + "px; height:" + QRCODE_SIZE + "px";
+    elem("qrcode").style = "width: " + 100 + "px; height:" + 100 + "px";
     elem('attributes').innerHTML = '';
     elem('ipfs-attributes').innerHTML = '';
     // Update attributes section
@@ -115,24 +118,38 @@ function setRecoveryContacts() {
         title: "Contacts Updated",
         type: 'success',
         text: 'Contacts updated successfully.'
-      });
+      }).catch(swal.noop);
+    }
+  });
+}
+
+function submitRecovery(recovery, json) {
+  contracts.identity.addRecovery.sendTransaction(recovery, json.key, {from: address}, function(err, result) {
+    if(!hasError(err)) {
+      log("Recovery submitted successfully.");
+      swal({
+        title: "Recovery Submitted",
+        type: 'success',
+        text: 'Recovery submitted successfully.'
+      }).catch(swal.noop);
     }
   });
 }
 
 /* USER SETUP FUNCTIONS */
 function checkForUser() {
-  var contract_address = localStorage.getItem('identity_address');
-  if(contract_address)
-    getIdentity(contract_address);
-  else
+  if(localStorage.getItem('identity_address')){
+    setContract('Identity', uuid);
+    getIdentity();
+  } else
     deployContract("Identity", registerUUID);
 }
 
 function registerUUID(contract_address) {
+  uuid = contract_address;
   addAttributeFormRow('name', user_name, []);
   setAttributes(true);
-  getIdentity(contract_address);
+  getIdentity();
 }
 
 /* POPUP FUNCTIONS */
@@ -165,6 +182,21 @@ function getQRCodeResult(code) {
     }, function(dismiss) {
       resetUrl();
     });
+  } else if(action === "recover"){
+    swal({
+      title: "Recovery Request",
+      html: 'User: <strong>' + parsed.uuid + '</strong><br /><br />' +
+        '<div class="ui form">' + 
+        '<div class="inline field"><label>Key</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
+        '</div>',
+      showCancelButton: true,
+      cancelButtonText: 'Cancel',
+      confirmButtonText: '<i class="ui icon checkmark"></i> Recover'
+    }).then(function() {
+      fetchIdentity(submitRecovery, parsed)
+    }, function(dismiss) {
+      resetUrl();
+    });
   } else if (action === "save") {
     var attributes = document.getElementsByClassName('attribute');
     var added = false;
@@ -189,6 +221,56 @@ function getQRCodeResult(code) {
   }
 }
 
+function showRecoveryPopup() {
+  swal({
+    title: 'Recover Account',
+    html: 
+      getQRFromJson({
+        action: 'recover',
+        uuid: uuid,
+        key: address
+      }) + '<br />' +
+      '<span id="recovery-num">0 / 0 recoveries',
+    customClass: 'recovery-modal',
+    showCancelButton: true,
+    confirmButtonText: 'Refresh',
+    showLoaderOnConfirm: true,
+    allowEscapeKey: false,
+    allowOutsideClick: false,
+    preConfirm: function (result) {
+      return new Promise(function (resolve, reject) {
+      })
+    }
+  }).then(function() {
+  }, function(dismiss) {
+    showSignUpPopup();
+  });
+}
+
+function showSignUpPopup() {
+  swal({
+    title: "Create an account",
+    input: 'text',
+    customClass: 'signup-modal',
+    html: '<div id="signup_log"><br />' +
+    '<button class="ui button" data-action="recover">Recover an Account</button>' + 
+    '<br /><br />or' + 
+    '</div>',
+    inputPlaceholder: 'Enter your name...',
+    confirmButtonText: 'Sign Up',
+    showLoaderOnConfirm: true,
+    allowEscapeKey: false,
+    allowOutsideClick: false,
+    preConfirm: function (result) {
+      return new Promise(function (resolve, reject) {
+        user_name = result;
+        user_resolve = resolve;
+        walletLogin();
+      })
+    }
+  });
+}
+
 function showSigningResultPopup(input) {
   delete input.action;
   input.signer = uuid;
@@ -203,30 +285,28 @@ function showSigningResultPopup(input) {
 
 function showContactRequestPopup() {
   swal({
+    title: 'Contact Card',
     html:
-      '<img src="' + elem('qrcode').src + '" />',
-    allowOutsideClick: false
-  });
+      '<img src="' + elem('qrcode').src + '" style="width: 300px; height: 300px" />',
+    showCloseButton: true
+  }).catch(swal.noop);
 }
 
 
 function showQRPopup(title, json, show_scanner) {
   swal({
     title: title,
-    html:
-      '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' + 
-      encodeURIComponent(JSON.stringify(json)) + '"><br />' +
+    html: getQRFromJson(json) + '<br />' +
       '<div class="ui form"><div class="field"><textarea rows="8">' +
       JSON.stringify(json, null, 2) +
       '</textarea></div></div>',
     showCancelButton: show_scanner,
-    confirmButtonText: show_scanner ? 'Open Scanner' : 'Ok',
-    allowOutsideClick: false
+    confirmButtonText: show_scanner ? 'Open Scanner' : 'Ok'
   }).then(function() {
     if(show_scanner)
       elem('scanner').click();
     resetUrl();
-  });
+  }).catch(swal.noop);
 }
 
 function showDesktopQR() {
@@ -303,7 +383,7 @@ function setAttributes(is_signup) {
           title: "Attributes Saved",
           type: 'success',
           text: 'Attributes saved successfully.'
-        });
+        }).catch(swal.noop);
     }
   });
 }
@@ -441,7 +521,7 @@ function addAttributeIDElem(name, value, signer, signature) {
 
 /* CONTRACT FUNCTIONS */
 function setContract(contract_name, contract_address) {
-  var compiled_contract = Identity['Identity.sol:' + contract_name];
+  var compiled_contract = ContractImport['Contracts.sol:' + contract_name];
   var contract_obj = web3.eth.contract(compiled_contract.abi);
   contracts[contract_name.toLowerCase()] = contract_obj.at(contract_address);
   localStorage.setItem(contract_name.toLowerCase() + '_address', contract_address);
@@ -449,7 +529,7 @@ function setContract(contract_name, contract_address) {
 
 function deployContract(contract_name, callback) {
   log("Deploying " + contract_name + " contract...");
-  var compiled_contract = Identity['Identity.sol:' + contract_name];
+  var compiled_contract = ContractImport['Contracts.sol:' + contract_name];
   var contract_obj = web3.eth.contract(compiled_contract.abi);
 
   // Get gas estimation
@@ -483,7 +563,9 @@ function addContact(addr) {
     '<div class="card contact" data-uuid="' + addr + '">' +
       '<div class="content">' +
         '<i class="right floated delete icon red" data-action="delete"></i>' +
-        '<div class="title overflow-ellipsis">' + addr + '</div>' +
+        '<img class="left floated mini ui image" src="images/user.png">' + 
+        '<div class="header">' + 'Contact' + '</div>' + 
+        '<div class="meta overflow-ellipsis">' + addr + '</div>' + 
       '</div>' +
     '</div>';
 }
@@ -512,7 +594,7 @@ function hasError(err) {
       title: "Operation Failed",
       type: 'error',
       html: 'There was a problem performing that action: <br />' + err
-    });
+    }).catch(swal.noop);
   }
   return err;
 }
@@ -523,6 +605,11 @@ function elem(id){
 
 function resetUrl() {
   window.history.pushState({} , '', window.location.origin);
+}
+
+function getQRFromJson(json) {
+  return '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' + 
+    encodeURIComponent(JSON.stringify(json)) + '">';
 }
 
 function getUrlParameter(input) {
@@ -555,23 +642,8 @@ function generateWallet(mnemonic, index) {
 
 
 /* LOGIN FUNCTION */
-function walletLogin(user_index) {
+function walletLogin() {
   log("Logging in as User " + user_index);
-
-  // Reset saved state from previous user
-  if(user_index !== localStorage.getItem('user_index')){
-    localStorage.setItem('user_index', user_index);
-    localStorage.removeItem('identity_address');
-    localStorage.removeItem('recovery_address');
-  }
-
-  // Generate Wallet
-  mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
-  wallet = generateWallet(mnemonic, user_index);
-  address = "0x" + wallet.getAddress().toString("hex");
-
-  log("User Address: " + address);
-  log("Mnemonic: " + mnemonic);
 
   // Supports Metamask and Mist, and other wallets that provide 'web3'
   // http://truffleframework.com/tutorials/bundling-with-webpack
@@ -618,30 +690,22 @@ window.addEventListener('load', function() {
     reverseButtons: true
   });
 
-  // Get user index
-  user_index = localStorage.getItem('user_index');
+  // Generate Wallet
+  uuid = localStorage.getItem('identity_address');
+  user_index = localStorage.getItem('user_index') || getRandomId().toString();
+  mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
+  wallet = generateWallet(mnemonic, user_index);
+  address = "0x" + wallet.getAddress().toString("hex");
+
+  log("User Address: " + address);
+  log("Mnemonic: " + mnemonic);
 
   // Login to wallet
-  if(user_index && localStorage.getItem('identity_address')){
-    walletLogin(user_index);
+  if(uuid && localStorage.getItem('user_index')){
+    walletLogin();
   } else {
-    swal({
-      title: "Create an account",
-      input: 'text',
-      html: '<div id="signup_log"></div>',
-      inputPlaceholder: 'Enter your name...',
-      confirmButtonText: 'Login',
-      showLoaderOnConfirm: true,
-      allowOutsideClick: false,
-      preConfirm: function (result) {
-        return new Promise(function (resolve, reject) {
-          user_name = result;
-          user_resolve = resolve;
-          user_index = getRandomId().toString();
-          walletLogin(user_index);
-        })
-      }
-    });
+    localStorage.setItem('user_index', user_index);
+    showSignUpPopup();
   }
 
   // Add button event listeners
@@ -659,7 +723,7 @@ window.addEventListener('load', function() {
         showCancelButton: true
       }).then(function() {
           contact.parentElement.removeChild(contact);
-      });
+      }).catch(swal.noop);
   });
   elem('setContacts').addEventListener('click', function(event) {
     setRecoveryContacts();
@@ -693,12 +757,16 @@ window.addEventListener('load', function() {
         showCancelButton: true
       }).then(function() {
           attr.parentElement.removeChild(attr);
-      });
+      }).catch(swal.noop);
   });
   elem('ipfs-attributes').addEventListener('click', function(event) {
     if(event.target.id == 'ipfs-attr-verify'){
       var result = verifyAttribute(event.target.parentNode.dataset.attribute, event.target.dataset.signature);
       setVerified(event.target.nextElementSibling, result);
     }
+  });
+  document.addEventListener('click', function(event) {
+    if(event.target.dataset.action === 'recover')
+      showRecoveryPopup();
   });
 });

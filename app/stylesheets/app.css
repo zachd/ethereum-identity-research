@@ -35,6 +35,22 @@
   color: #009925;
 }
 
+/* SIGNUP MODAL */
+.signup-modal .swal2-input {
+  display: inline !important;
+  text-align: left !important;
+  width: 70% !important;
+}
+.signup-modal .swal2-spacer {
+  display: none !important;
+}
+.signup-modal .swal2-confirm {
+  display: inline !important;
+}
+.recovery-modal .swal2-loading {
+  vertical-align: baseline !important;
+}
+
 /* LOGGER */
 textarea {
   font-size: 0.85em !important;
@@ -53,28 +69,15 @@ textarea {
   color: red;
 }
 
-
-/* CONTACTS */
-.contact {
-  display: inline-block;
-  padding: 10px 10px 10px 33px;
-  margin: 2px;
-  border-radius: 3px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  user-select: none;
-  background: url(/images/icon-user.png) no-repeat 5px;
-  background-size: 25px;
-}
-.contact:hover {
+/* EXTRA */
+i.icon.delete:hover {
   cursor: pointer;
-  background-color: #eee;
 }
-.contact.selected {
-  background-color: #ccc;
-  border: 1px solid #aaa;
+
+.contact .meta {
+  padding-right: 20px;
 }
-.contact img {
-  width: 30px;
-  height: 30px;
+
+.contact .image {
+  border-radius: 3px;
 }
