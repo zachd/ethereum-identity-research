@@ -123,8 +123,8 @@ function setRecoveryContacts() {
   });
 }
 
-function submitRecovery(recovery, json) {
-  contracts.identity.addRecovery.sendTransaction(recovery, json.key, {from: address}, function(err, result) {
+function submitRecovery(recovery_address, key) {
+  contracts.identity.addRecovery.sendTransaction(recovery_address, key, {from: address}, function(err, result) {
     if(!hasError(err)) {
       log("Recovery submitted successfully.");
       swal({
@@ -165,6 +165,7 @@ function getQRCodeResult(code) {
   try {
     parsed = JSON.parse(input);
     action = parsed.action;
+    console.log(parsed);
   } catch(e) {}
   if(action === "sign"){
     swal({
@@ -186,17 +187,26 @@ function getQRCodeResult(code) {
     swal({
       title: "Recovery Request",
       html: 'User: <strong>' + parsed.uuid + '</strong><br /><br />' +
-        '<div class="ui form">' + 
-        '<div class="inline field"><label>Key</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
-        '</div>',
+        '<div class="ui form" id="recovery-request">' + 
+          '<div class="field"><label>Proposed Key</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
+        '</div><br /><div id="signup_log"></div>',
       showCancelButton: true,
       cancelButtonText: 'Cancel',
-      confirmButtonText: '<i class="ui icon checkmark"></i> Recover'
+      confirmButtonText: '<i class="ui icon checkmark"></i> Recover',
+      showLoaderOnConfirm: true,
+      preConfirm: function () {
+        return new Promise(function (resolve, reject) {
+          user_resolve = resolve;
+          submitRecovery(elem('recovery-request').dataset.recovery, parsed.key);
+        })
+      }
     }).then(function() {
-      fetchIdentity(submitRecovery, parsed)
+      resetUrl();
     }, function(dismiss) {
       resetUrl();
     });
+    swal.showLoading();
+    fetchIdentity(parsed.uuid, updateRecoveryRequestPopup, parsed);
   } else if (action === "save") {
     var attributes = document.getElementsByClassName('attribute');
     var added = false;
@@ -221,6 +231,11 @@ function getQRCodeResult(code) {
   }
 }
 
+function updateRecoveryRequestPopup(result, parsed) {
+  swal.hideLoading();
+  elem('recovery-request').dataset.recovery = result[2];
+}
+
 function showRecoveryPopup() {
   swal({
     title: 'Recover Account',
@@ -237,7 +252,7 @@ function showRecoveryPopup() {
     showLoaderOnConfirm: true,
     allowEscapeKey: false,
     allowOutsideClick: false,
-    preConfirm: function (result) {
+    preConfirm: function () {
       return new Promise(function (resolve, reject) {
       })
     }
@@ -348,8 +363,8 @@ function scan() {
     canvas.getContext('2d').drawImage(video, 0, 0, video.offsetWidth, video.offsetHeight);
     try {
       var result = qrcode().decode(canvas);
-      getQRCodeResult(result);
       stopVideo();
+      getQRCodeResult(result);
     } catch(e) {
       // QR parsing error
     }
