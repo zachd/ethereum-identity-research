@@ -11,6 +11,7 @@ module.exports = {
   },
   module: {
     rules: [
+      { test: /\.sol$/, loader: 'solc-loader' },
       { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader"},
       { test: /\.css$/, use: ExtractTextPlugin.extract({
           fallback: "style-loader", use: "css-loader"
@@ -24,10 +25,8 @@ module.exports = {
   plugins: [
     new CopyWebpackPlugin([
       { from: './app/index.html', to: "index.html" },
-      { from: './app/user/index.html', to: "user/index.html" },
       { from: './app/fonts', to: "fonts" },
-      { from: './app/images', to: "images" },
-      { from: './contracts', to: "contracts" }
+      { from: './app/images', to: "images" }
     ]),
     new ExtractTextPlugin("app.css")
   ],

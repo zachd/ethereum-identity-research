@@ -5,6 +5,9 @@ require("../stylesheets/app.css");
 require("sweetalert2/dist/sweetalert2.min.css");
 require("semantic-ui-css/semantic.min.css");
 
+// Contract import
+const Identity = require('../contracts/Identity.sol');
+
 // HD/BIP39 imports: http://truffleframework.com/tutorials/using-infura-custom-provider#full-code
 const bip39 = require("bip39");
 const wallet_hdpath = "m/44'/60'/0'/0/";
@@ -30,7 +33,7 @@ var contracts = {}
 // Wallet variables
 var user_index;
 var user_name;
-var user_resolve;
+var user_resolve = null;
 var mnemonic;
 var wallet;
 var address;
@@ -45,10 +48,11 @@ var profile = {
 
 /* IDENTITY FUNCTIONS */
 function getIdentity(contract_address) {
-  var identity_abi = web3.eth.contract(JSON.parse(localStorage.getItem('identity_abi')));
-  var contract = identity_abi.at(contract_address);
-  elem("profileuuid").innerHTML = contract_address + ' (User ' + user_index + ')';
-  contract.getDetails.call({from: address}, function(err, result) {
+  uuid = contract_address;
+  setContract('Identity', contract_address);
+  elem('uuid').innerHTML = contract_address + ' (User ' + user_index + ')';
+  elem("profileuuid").innerHTML = elem('uuid').innerHTML;
+  contracts.identity.getDetails.call({from: address}, function(err, result) {
     if(!hasError(err))
       showIdentity(result);
   });
@@ -117,51 +121,18 @@ function setRecoveryContacts() {
 }
 
 /* USER SETUP FUNCTIONS */
-function compileContracts() {
-  if(!localStorage.getItem('identity_abi'))
-    compileContract('Identity', checkForUser);
-  else
-    checkForUser();
-  if(!localStorage.getItem('recovery_abi'))
-    compileContract('Recovery', null);
-}
-
-function checkForUser(contract_result) {
+function checkForUser() {
   var contract_address = localStorage.getItem('identity_address');
   if(contract_address)
-    showUser(contract_address);
+    getIdentity(contract_address);
   else
-    registerUser(contract_result);
-}
-
-function showUser(contract_address) {
-  setUUID(contract_address);
-  getIdentity(contract_address);
-}
-
-function registerUser(contract_result) {
-  if(contract_result)
-    deployContract(contract_result, "Identity", registerUUID);
-  else
-    compileContract("Identity", deployContract, registerUUID);
+    deployContract("Identity", registerUUID);
 }
 
 function registerUUID(contract_address) {
-  setUserName();
-  setUUID(contract_address);
-  getIdentity(contract_address);
-}
-
-function setUUID(contract_address) {
-  uuid = contract_address;
-  setContract('Identity', contract_address);
-  elem('uuid').innerHTML = contract_address 
-    + ' (User ' + user_index + ')';
-}
-
-function setUserName() {
   addAttributeFormRow('name', user_name, []);
   setAttributes(true);
+  getIdentity(contract_address);
 }
 
 /* POPUP FUNCTIONS */
@@ -470,40 +441,24 @@ function addAttributeIDElem(name, value, signer, signature) {
 
 /* CONTRACT FUNCTIONS */
 function setContract(contract_name, contract_address) {
-  var contract_obj = web3.eth.contract(JSON.parse(localStorage.getItem(contract_name.toLowerCase() + '_abi')));
+  var compiled_contract = Identity['Identity.sol:' + contract_name];
+  var contract_obj = web3.eth.contract(compiled_contract.abi);
   contracts[contract_name.toLowerCase()] = contract_obj.at(contract_address);
   localStorage.setItem(contract_name.toLowerCase() + '_address', contract_address);
 }
 
-function compileContract(contract_name, callback, deploy_callback) {
-  log("Compiling " + contract_name + " contract...");
-  var params = params || [];
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/contracts/" + contract_name + ".sol");
-  xhr.onload = function() {
-    web3.eth.compile.solidity(this.response, function(err, result) {
-      if(!hasError(err)) {
-        log(contract_name + " contract compiled.");
-        localStorage.setItem(contract_name.toLowerCase() + '_abi', JSON.stringify(result.info.abiDefinition));
-        if(callback)
-          callback.apply(null, [result, contract_name, deploy_callback]);
-      }
-    });
-  };
-  xhr.send();
-}
-
-function deployContract(result, contract_name, callback) {
+function deployContract(contract_name, callback) {
   log("Deploying " + contract_name + " contract...");
-  var contract_obj = web3.eth.contract(result.info.abiDefinition);
+  var compiled_contract = Identity['Identity.sol:' + contract_name];
+  var contract_obj = web3.eth.contract(compiled_contract.abi);
 
   // Get gas estimation
-  web3.eth.estimateGas({data: result.code}, function(err, gasEstimate) {
+  web3.eth.estimateGas({data: compiled_contract.bytecode}, function(err, gasEstimate) {
     log(contract_name + " contract gas estimate: " + gasEstimate);
     // Deploy contract
     if(!hasError(err))
       contracts[contract_name.toLowerCase()] = contract_obj.new(
-        {from: address, data: result.code, gas: gasEstimate},
+        {from: address, data: compiled_contract.bytecode, gas: gasEstimate},
         function(err, deployResult){
           // Show deployed contract results
           if(!hasError(err))
@@ -635,7 +590,7 @@ function walletLogin(user_index) {
     }
   });
 
-  compileContracts();
+  checkForUser();
 
   // Show data on page
   elem('address').innerHTML = address;

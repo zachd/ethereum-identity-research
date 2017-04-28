@@ -11,6 +11,7 @@
     "qrcode-reader": "^0.2.2",
     "semantic-ui-css": "^2.2.10",
     "solc": "^0.4.9",
+    "solc-loader": "^1.1.1",
     "sweetalert2": "^6.4.3",
     "truffle-hdwallet-provider": "0.0.3",
     "web3": "^0.18.2",
