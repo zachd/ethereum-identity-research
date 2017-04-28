@@ -172,10 +172,10 @@ function showRequestAttestationPopup(elem) {
 }
 
 function getQRCodeResult(code) {
-  var parsed;
-  var action;
+  var parsed, action;
+  var input = decodeURIComponent(code).replace('+', ' ');
   try {
-    parsed = JSON.parse(decodeURIComponent(code).replace('+', ' '));
+    parsed = JSON.parse(input);
     action = parsed.action;
   } catch(e) {}
   if(action === "sign"){
@@ -214,7 +214,7 @@ function getQRCodeResult(code) {
     setRecoveryContacts();
     resetUrl();
   } else {
-    hasError("Invalid QR code.")
+    hasError("Invalid QR code: <br />" + input);
   }
 }
 
@@ -228,6 +228,14 @@ function showSigningResultPopup(input) {
     signature: signature
   };
   showQRPopup('Signature Result', result);
+}
+
+function showContactRequestPopup() {
+  swal({
+    html:
+      '<img src="' + elem('qrcode').src + '" />',
+    allowOutsideClick: false
+  });
 }
 
 
@@ -713,6 +721,9 @@ window.addEventListener('load', function() {
   });
   elem('addAttributeFormRow').addEventListener('click', function(event) {
     addAttributeFormRow('', '', [], true);
+  });
+  elem('qrcode').addEventListener('click', function(event) {
+    showContactRequestPopup();
   });
   elem('attributes').addEventListener('click', function(event) {
     var attr = event.target.parentElement.parentElement;

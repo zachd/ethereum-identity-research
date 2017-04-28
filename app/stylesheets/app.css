@@ -3,6 +3,9 @@
   float: left;
   margin-right: 3px;
 }
+#qrcode:hover {
+  cursor: pointer;
+}
 
 /* ATTRIBUTES */
 .ipfs-attribute-name, .ipfs-attribute-value {

@@ -6,7 +6,7 @@ var ExtractTextPlugin = require("extract-text-webpack-plugin");
 module.exports = {
   entry: './app/javascripts/app.js',
   output: {
-     path: path.resolve(__dirname, "build"),
+    path: path.resolve(__dirname, "build"),
     filename: 'app.js'
   },
   module: {
@@ -25,6 +25,7 @@ module.exports = {
     new CopyWebpackPlugin([
       { from: './app/index.html', to: "index.html" },
       { from: './app/user/index.html', to: "user/index.html" },
+      { from: './app/fonts', to: "fonts" },
       { from: './app/images', to: "images" },
       { from: './contracts', to: "contracts" }
     ]),
