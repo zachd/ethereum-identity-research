@@ -223,11 +223,15 @@ function getQRCodeResult(code) {
       hasError('Error: Attribute does not exist on profile');
     resetUrl();
   } else if (action === "contact") {
-    addContact(parsed.uuid);
-    setRecoveryContacts();
+    if(getContactElements().indexOf(parsed.uuid) > -1){
+      hasError('Error: Contact already exists');
+    } else {
+      addContact(parsed.uuid);
+      setRecoveryContacts();
+    }
     resetUrl();
   } else {
-    hasError("Invalid QR code: <br />" + input);
+    hasError("Error: Invalid QR code: <br />" + input);
   }
 }
 
@@ -268,7 +272,7 @@ function showSignUpPopup() {
     input: 'text',
     customClass: 'signup-modal',
     html: '<div id="signup_log"><br />' +
-    '<button class="ui button" data-action="recover">Recover an Account</button>' + 
+    '<button class="ui button" data-action="recover">Recover Account</button>' + 
     '<br /><br />or' + 
     '</div>',
     inputPlaceholder: 'Enter your name...',
@@ -276,9 +280,17 @@ function showSignUpPopup() {
     showLoaderOnConfirm: true,
     allowEscapeKey: false,
     allowOutsideClick: false,
-    preConfirm: function (result) {
+     inputValidator: function(input) {
+      return new Promise(function(resolve, reject) {
+        if (input === "")
+          reject("Please enter a valid name.");
+        resolve();
+      })
+    },
+    preConfirm: function (input) {
       return new Promise(function (resolve, reject) {
-        user_name = result;
+        if(!input) reject();
+        user_name = input;
         user_resolve = resolve;
         walletLogin();
       })
@@ -341,7 +353,7 @@ function showDesktopQR() {
   if (navigator.getUserMedia) {
     navigator.getUserMedia({video: true}, successCallback, function(e) {});
   } else {
-    hasError("Video is not supported in this browser.");
+    hasError("Error: Webcam not supported");
   }
 }
 

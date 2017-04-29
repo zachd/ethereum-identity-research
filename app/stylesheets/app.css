@@ -41,6 +41,10 @@
   text-align: left !important;
   width: 70% !important;
 }
+.signup-modal .swal2-validationerror {
+  float: left;
+  width: 110%;
+}
 .signup-modal .swal2-spacer {
   display: none !important;
 }
