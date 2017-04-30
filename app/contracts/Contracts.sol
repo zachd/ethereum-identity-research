@@ -12,10 +12,8 @@ contract Recovery {
     }
     modifier onlyContact(){
         for(uint i = 0; i < contacts.length; i++)
-            if(contacts[i] == msg.sender){
+            if(contacts[i] == msg.sender)
                 _;
-                break;
-            }
     }
 
     function Recovery(address _uuid) {

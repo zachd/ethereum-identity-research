@@ -22,7 +22,7 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 // Global settings
 const NUM_ACCOUNTS = 100;
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const DEFAULT_MNEMONIC = "replace siege village purpose melody soup proud depart tenant message wreck undo";
+const DEFAULT_MNEMONIC = "scrap unhappy curtain plate oppose property nasty solve shoulder net winner also";
 
 // Contract variables
 var uuid;
@@ -110,9 +110,16 @@ function getNumRecoveries(proposed_key) {
     if(!hasError(err) && result){
       elem("num-recoveries").textContent = result[0];
       elem("total-recoveries").textContent = result[1];
-      swal.hideLoading();
+      fetchIdentity(uuid, checkRecoveryKey);
     }
   });
+}
+
+function checkRecoveryKey(result) {
+  if(address === result[0])
+    resolveModal();
+  else
+    swal.hideLoading();
 }
 
 function setRecoveryContacts() {
@@ -180,7 +187,6 @@ function getQRCodeResult(result, callback) {
   try {
     parsed = JSON.parse(input);
     action = parsed.action;
-    console.log(parsed);
   } catch(e) {}
   callback(parsed, action);
 }
@@ -266,8 +272,6 @@ function updateRecoveryRequestPopup(result) {
 
 function receiveRecoveryScan(parsed, action) {
   if(action === "contact" && parsed.uuid){
-    if (window.localMediaStream)
-      stopVideo();
     swal.getInput().value = parsed.uuid;
     swal.clickConfirm();
   } else {
@@ -288,6 +292,8 @@ function showRecoveryPopup() {
       return new Promise(function(resolve, reject) {
         if (input === "" || !ethUtils.isValidAddress(input))
           reject("Please enter a valid UUID.");
+        if (window.localMediaStream)
+          stopVideo();
         resolve();
       })
     },
@@ -307,7 +313,13 @@ function showRecoveryPopup() {
     confirmButtonText: 'Next &rarr;',
     progressSteps: ['1', '2', '3']
   }]).then(function (result) {
-    console.log("done");
+    setContract('Identity', uuid);
+    elem('details').style.display = "block";
+    swal({
+      title: 'Recovery Complete',
+      type: 'success',
+      text: 'Your account was recovered successfully.'
+    }).catch(swal.noop);
   }, function (dismiss) {
     if(window.localMediaStream)
       stopVideo();
@@ -316,8 +328,7 @@ function showRecoveryPopup() {
 }
 
 function updateRecoverAccountPopup() {
-  user_resolve();
-  user_resolve = null;
+  resolveModal();
   swal.insertQueueStep({
     title: 'Confirm Details',
     html: '<p>Make sure the details below look correct.</p>' + 
@@ -347,13 +358,16 @@ function updateRecoverAccountPopup() {
     allowEscapeKey: false,
     showCancelButton: true,
     showLoaderOnConfirm: true,
-    confirmButtonText: 'Refresh',
+    confirmButtonText: '<i class="ui icon refresh"></i> Refresh',
     progressSteps: ['1', '2', '3'],
     preConfirm: function (input) {
       return new Promise(function (resolve, reject) {
         user_resolve = resolve;
         getNumRecoveries();
       })
+    },
+    onOpen: function () {
+      swal.clickConfirm();
     }
   });
 }
@@ -501,8 +515,7 @@ function setAttributes(is_signup) {
       var hash = result[0].hash;
       setIPFSHash(hash);
       if(is_signup){
-        user_resolve();
-        user_resolve = null;
+        resolveModal();
       }
       else
         swal({
@@ -725,6 +738,11 @@ function hasError(err) {
 
 function elem(id){
   return document.getElementById(id);
+}
+
+function resolveModal() {
+  user_resolve();
+  user_resolve = null;
 }
 
 function resetUrl() {
