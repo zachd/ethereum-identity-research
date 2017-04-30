@@ -32,11 +32,15 @@ contract Recovery {
             recoveries[msg.sender] = _key;
             proposed_keys[_key] += 1;
         }
-        if (proposed_keys[_key] > (contacts.length / 2)){
+        if (proposed_keys[_key] >= (contacts.length / 2)){
             Identity identity_c = Identity(uuid);
             proposed_keys[_key] = 0;
             identity_c.transferOwner(_key);
         }
+    }
+    function getRecoveries(address _key) returns (uint num_done, uint num_total) {
+        num_done = proposed_keys[_key];
+        num_total = contacts.length / 2;
     }
 }
 

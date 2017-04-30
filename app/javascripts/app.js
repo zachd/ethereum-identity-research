@@ -22,7 +22,7 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 // Global settings
 const NUM_ACCOUNTS = 100;
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const DEFAULT_MNEMONIC = "large that lunar glove icon chair wall sentence bundle unfold speak foot";
+const DEFAULT_MNEMONIC = "replace siege village purpose melody soup proud depart tenant message wreck undo";
 
 // Contract variables
 var uuid;
@@ -48,7 +48,6 @@ var profile = {
 /* IDENTITY FUNCTIONS */
 function getIdentity() {
   elem('uuid').innerHTML = uuid + ' (User ' + user_index + ')';
-  elem("profileuuid").innerHTML = elem('uuid').innerHTML;
   fetchIdentity(uuid, showIdentity);
 }
 
@@ -61,26 +60,24 @@ function fetchIdentity(contract_address, callback, params) {
   });
 }
 
-function showIdentity(result) {
+function showIdentity(result, callback) {
   if(result[0] > 0){
     // Update profile box
-    elem("owner").innerHTML = result[0];
-    elem("ipfshash").innerHTML = result[1] || '(none)';
-    elem("recovery").innerHTML = result[2];
-    elem("qrcode").src = "http://chart.apis.google.com/chart?cht=qr&chs=" 
-       + "350x350"  + "&chl=" + encodeURIComponent(JSON.stringify(
-      {'action': 'contact', 'uuid': uuid}
-    ));
-    elem("qrcode").style = "width: " + 100 + "px; height:" + 100 + "px";
+    elem('owner').innerHTML = result[0];
+    elem('ipfshash').innerHTML = result[1] || '(none)';
+    elem('recovery').innerHTML = result[2];
     elem('attributes').innerHTML = '';
     elem('ipfs-attributes').innerHTML = '';
     // Update attributes section
     if(result[1])
-      getAttributes(result[1]);
+      getAttributes(result[1], callback);
     // Update recovery contacts
     if(result[2]){
       setContract('Recovery', result[2]);
       getRecoveryContacts();
+    }
+    if(!callback){
+      elem('details').style.display = 'block';
     }
   }
 }
@@ -108,6 +105,16 @@ function getRecoveryContacts() {
   });
 }
 
+function getNumRecoveries(proposed_key) {
+  contracts.recovery.getRecoveries.call(address, {from: address}, function(err, result) {
+    if(!hasError(err) && result){
+      elem("num-recoveries").textContent = result[0];
+      elem("total-recoveries").textContent = result[1];
+      swal.hideLoading();
+    }
+  });
+}
+
 function setRecoveryContacts() {
   var contacts = getContactElements();
   log("Updating contacts in recovery profile...");
@@ -120,6 +127,7 @@ function setRecoveryContacts() {
         text: 'Contacts updated successfully.'
       }).catch(swal.noop);
     }
+    getRecoveryContacts();
   });
 }
 
@@ -155,18 +163,34 @@ function registerUUID(contract_address) {
 /* POPUP FUNCTIONS */
 function showRequestAttestationPopup(elem) {
   var inputs = elem.getElementsByTagName('input');
-  var json = getSigningJson(inputs[0].value, inputs[1].value);
+  var json = {
+    action: "sign",
+    owner: uuid,
+    key: inputs[0].value,
+    value: inputs[1].value
+  };
   showQRPopup('Request Attestation', json, true);
 }
 
-function getQRCodeResult(code) {
+function getQRCodeResult(result, callback) {
   var parsed, action;
-  var input = decodeURIComponent(code).replace('+', ' ');
+  var input = decodeURIComponent(result).replace('+', ' ');
+
+  // Parse QR code result
   try {
     parsed = JSON.parse(input);
     action = parsed.action;
     console.log(parsed);
   } catch(e) {}
+  callback(parsed, action);
+}
+
+function performQRAction(parsed, action) {
+  // Stop video stream
+  if(window.localMediaStream)
+    stopVideo();
+
+  // Perform parsed action
   if(action === "sign"){
     swal({
       title: "Signature Request",
@@ -206,7 +230,7 @@ function getQRCodeResult(code) {
       resetUrl();
     });
     swal.showLoading();
-    fetchIdentity(parsed.uuid, updateRecoveryRequestPopup, parsed);
+    fetchIdentity(parsed.uuid, updateRecoveryRequestPopup);
   } else if (action === "save") {
     var attributes = document.getElementsByClassName('attribute');
     var added = false;
@@ -235,34 +259,102 @@ function getQRCodeResult(code) {
   }
 }
 
-function updateRecoveryRequestPopup(result, parsed) {
+function updateRecoveryRequestPopup(result) {
   swal.hideLoading();
   elem('recovery-request').dataset.recovery = result[2];
 }
 
+function receiveRecoveryScan(parsed, action) {
+  if(action === "contact" && parsed.uuid){
+    if (window.localMediaStream)
+      stopVideo();
+    swal.getInput().value = parsed.uuid;
+    swal.clickConfirm();
+  } else {
+    swal.showValidationError("Error: Invalid QR code");
+    setTimeout(function(){ swal.resetValidationError() }, 2000);
+  }
+}
+
 function showRecoveryPopup() {
-  swal({
-    title: 'Recover Account',
-    html: 
+  swal.queue([{
+    title: 'Select an Account',
+    input: 'text',
+    html: '<div id="recovery-info"><p>To recover your account, scan your contact card from a friends device or enter your UUID manually.' +
+    '</p><button class="ui button" data-action="recovery-scanner">Open Scanner</button>' + 
+    '<br /><br />or' + 
+    '</div>',
+    inputValidator: function(input) {
+      return new Promise(function(resolve, reject) {
+        if (input === "" || !ethUtils.isValidAddress(input))
+          reject("Please enter a valid UUID.");
+        resolve();
+      })
+    },
+    preConfirm: function (input) {
+      return new Promise(function (resolve, reject) {
+        user_resolve = resolve;
+        uuid = swal.getInput().value;
+        fetchIdentity(uuid, showIdentity, updateRecoverAccountPopup);
+      })
+    },
+    customClass: 'recovery-modal',
+    inputPlaceholder: 'Enter your UUID...',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showCancelButton: true,
+    showLoaderOnConfirm: true,
+    confirmButtonText: 'Next &rarr;',
+    progressSteps: ['1', '2', '3']
+  }]).then(function (result) {
+    console.log("done");
+  }, function (dismiss) {
+    if(window.localMediaStream)
+      stopVideo();
+    showSignUpPopup();
+  });
+}
+
+function updateRecoverAccountPopup() {
+  user_resolve();
+  user_resolve = null;
+  swal.insertQueueStep({
+    title: 'Confirm Details',
+    html: '<p>Make sure the details below look correct.</p>' + 
+      '<div class="ui card contact grid container">' +
+        '<div class="content">' +
+          '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' + 
+          '<div class="header">' + elem('name').textContent + '</div>' + 
+          '<div class="meta overflow-ellipsis">' + uuid + '</div>' + 
+        '</div>' +
+      '</div>',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showCancelButton: true,
+    customClass: 'recovery-modal',
+    confirmButtonText: 'Next &rarr;',
+    progressSteps: ['1', '2', '3']
+  });
+  swal.insertQueueStep({
+    title: 'Request Recovery',
+    html: '<p>Ask you contacts to scan the code below.</p>' + 
       getQRFromJson({
         action: 'recover',
         uuid: uuid,
         key: address
-      }) + '<br />' +
-      '<span id="recovery-num">0 / 0 recoveries',
-    customClass: 'recovery-modal',
-    showCancelButton: true,
-    confirmButtonText: 'Refresh',
-    showLoaderOnConfirm: true,
-    allowEscapeKey: false,
+      }) + '<br /><span id="num-recoveries"></span> / <span id="total-recoveries"></span> recoveries',
     allowOutsideClick: false,
-    preConfirm: function () {
+    allowEscapeKey: false,
+    showCancelButton: true,
+    showLoaderOnConfirm: true,
+    confirmButtonText: 'Refresh',
+    progressSteps: ['1', '2', '3'],
+    preConfirm: function (input) {
       return new Promise(function (resolve, reject) {
+        user_resolve = resolve;
+        getNumRecoveries();
       })
     }
-  }).then(function() {
-  }, function(dismiss) {
-    showSignUpPopup();
   });
 }
 
@@ -272,7 +364,7 @@ function showSignUpPopup() {
     input: 'text',
     customClass: 'signup-modal',
     html: '<div id="signup_log"><br />' +
-    '<button class="ui button" data-action="recover">Recover Account</button>' + 
+    '<button class="ui button" data-action="recover-account">Recover Account</button>' + 
     '<br /><br />or' + 
     '</div>',
     inputPlaceholder: 'Enter your name...',
@@ -280,7 +372,7 @@ function showSignUpPopup() {
     showLoaderOnConfirm: true,
     allowEscapeKey: false,
     allowOutsideClick: false,
-     inputValidator: function(input) {
+    inputValidator: function(input) {
       return new Promise(function(resolve, reject) {
         if (input === "")
           reject("Please enter a valid name.");
@@ -292,7 +384,7 @@ function showSignUpPopup() {
         if(!input) reject();
         user_name = input;
         user_resolve = resolve;
-        walletLogin();
+        checkForUser();
       })
     }
   });
@@ -310,11 +402,13 @@ function showSigningResultPopup(input) {
   showQRPopup('Signature Result', result);
 }
 
-function showContactRequestPopup() {
+function showContactPopup(title, contact_uuid) {
   swal({
-    title: 'Contact Card',
+    title: title,
     html:
-      '<img src="' + elem('qrcode').src + '" style="width: 300px; height: 300px" />',
+      '<img src="http://chart.apis.google.com/chart?cht=qr&chs=350x350&chl=' + encodeURIComponent(
+        JSON.stringify({action: 'contact', uuid: contact_uuid})
+      ) + '" style="width: 300px; height: 300px" />',
     showCloseButton: true
   }).catch(swal.noop);
 }
@@ -336,11 +430,10 @@ function showQRPopup(title, json, show_scanner) {
   }).catch(swal.noop);
 }
 
-function showDesktopQR() {
+function showDesktopQRPopup(callback) {
   swal({
     title: 'Scanner',
-    html: '<video id="desktop-scanner" style="width: 460px;height: 345px;"></video><br />' +
-    '<canvas id="qr-canvas" style="display: none"></canvas>',
+    html: desktopQRElement(),
     showCloseButton: true
   }).then(
     function () {
@@ -350,14 +443,20 @@ function showDesktopQR() {
       stopVideo();
     }
   );
-  if (navigator.getUserMedia) {
-    navigator.getUserMedia({video: true}, successCallback, function(e) {});
+  startVideo(callback);
+}
+
+function startVideo(callback) {
+  if (navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({video: true}).then(function(stream) {
+      successCallback(stream, callback);
+    }).catch(function(err) {});
   } else {
     hasError("Error: Webcam not supported");
   }
 }
 
-function successCallback(stream) {
+function successCallback(stream, callback) {
   var video = elem('desktop-scanner');
   var canvas = elem('qr-canvas');
   video.src = (window.URL && window.URL.createObjectURL(stream)) || stream;
@@ -365,18 +464,17 @@ function successCallback(stream) {
   window.localMediaStream = stream;
   canvas.width = video.offsetWidth;
   canvas.height = video.offsetHeight;
-  stopScan = setInterval(function(){ scan(); }, 200);
+  stopScan = setInterval(function(){ scan(callback); }, 200);
 }
 
-function scan() {
+function scan(callback) {
   if (window.localMediaStream) {
     var canvas = elem('qr-canvas');
     var video = elem('desktop-scanner');
     canvas.getContext('2d').drawImage(video, 0, 0, video.offsetWidth, video.offsetHeight);
     try {
       var result = qrcode().decode(canvas);
-      stopVideo();
-      getQRCodeResult(result);
+      getQRCodeResult(result, callback);
     } catch(e) {
       // QR parsing error
     }
@@ -386,6 +484,7 @@ function scan() {
 function stopVideo() {
   clearInterval(stopScan);
   window.localMediaStream.getVideoTracks()[0].stop();
+  window.localMediaStream = null;
 }
 
 
@@ -415,7 +514,7 @@ function setAttributes(is_signup) {
   });
 }
 
-function getAttributes(hash) {
+function getAttributes(hash, callback) {
   ipfs.files.cat(hash, function (err, stream) {
     if(!hasError(err)) {
       var file = '';
@@ -429,15 +528,20 @@ function getAttributes(hash) {
         elem('ipfs-attributes').innerHTML = '';
         for (var att in data.attributes){
           if (data.attributes.hasOwnProperty(att)){
+            if(att === "name") {
+              user_name = data.attributes[att];
+              elem('name').innerHTML = data.attributes[att];
+            }
             addAttributeFormRow(att, data.attributes[att], data.signatures[att]);
             addAttributeIDElem(att, data.attributes[att], data.signatures[att]);
           }
         }
         // Check for incoming code
         var code = getUrlParameter('code');
-        if (code) {
-          getQRCodeResult(code);
-        }
+        if (code)
+          getQRCodeResult(code, performQRAction);
+        // Check for callback
+        if (callback) callback();
       });
     }
   });
@@ -458,15 +562,6 @@ function verifyAttribute(attribute, RPCsig) {
   return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
 }
 
-function getSigningJson(key, value) {
-  var result = {};
-  result.action = "sign";
-  result.owner = uuid;
-  result.key = key;
-  result.value = value;
-  return result;
-}
-
 function setVerified(element, result) {
   var textresult = result ? 'Verified' : 'Unverified';
   element.className = textresult.toLowerCase();
@@ -482,7 +577,8 @@ function addAttributeFormRow(name, value, signatures, empty){
   attribute.innerHTML =
     '<div class="content">' +
       '<i class="right floated delete icon red" data-action="delete"></i>' +
-      '<div class="inline field"><input type="text" value="' + name + '"></div>' +
+      '<div class="inline field"><input type="text" value="' + name + '"' 
+        + (name === "name" ? 'disabled' : '') +'></div>' +
       '<div class="description field"><input type="text" value="' + value + '"></div>' +
       '<div class="signatures verified"></div>' +
     '</div>' +
@@ -590,7 +686,7 @@ function addContact(addr) {
     '<div class="card contact" data-uuid="' + addr + '">' +
       '<div class="content">' +
         '<i class="right floated delete icon red" data-action="delete"></i>' +
-        '<img class="left floated mini ui image" src="images/user.png">' + 
+        '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' + 
         '<div class="header">' + 'Contact' + '</div>' + 
         '<div class="meta overflow-ellipsis">' + addr + '</div>' + 
       '</div>' +
@@ -620,7 +716,8 @@ function hasError(err) {
     swal({
       title: "Operation Failed",
       type: 'error',
-      html: 'There was a problem performing that action: <br />' + err
+      html: 'There was a problem performing that action: <br /><br />' +
+        '<span class="log-text">' + err + '</span>'
     }).catch(swal.noop);
   }
   return err;
@@ -653,6 +750,15 @@ function show_hide(show, hide){
   elem(hide).style.display = "none";
 }
 
+function isMobile() {
+  return ('ontouchstart' in window || 'onmsgesturechange' in window) && window.screenX === 0;
+}
+
+function desktopQRElement() {
+  return '<video id="desktop-scanner" style="width: 460px;height: 345px;"></video><br />' +
+    '<canvas id="qr-canvas" style="display: none"></canvas>';
+}
+
 function getRandomId() {
   return Math.floor(Math.random() * NUM_ACCOUNTS) + 1;
 }
@@ -667,9 +773,38 @@ function generateWallet(mnemonic, index) {
   return hdwallet.derivePath(wallet_hdpath + index).getWallet();
 }
 
+/* MAIN LOAD EVENT */
+window.addEventListener('load', function() {
+  // Start logger
+  elem('logger').innerHTML = "Ethereum Identity 1.0";
 
-/* LOGIN FUNCTION */
-function walletLogin() {
+  // Check for mobile device http://stackoverflow.com/a/14283643
+  if(isMobile())
+    elem('scanner').href = "zxing://scan/?ret=" + 
+      encodeURIComponent(location.protocol + '//' + location.host 
+      + location.pathname + "?code={CODE}"
+    );
+  else
+    elem('scanner').addEventListener('click', function(event) {
+      showDesktopQRPopup(performQRAction);
+    });
+
+  // Set sweetalert defaults
+  swal.setDefaults({
+    reverseButtons: true
+  });
+
+  // Generate Wallet
+  uuid = localStorage.getItem('identity_address');
+  user_index = localStorage.getItem('user_index') || getRandomId().toString();
+  mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
+  wallet = generateWallet(mnemonic, user_index);
+  address = "0x" + wallet.getAddress().toString("hex");
+
+
+  // Log results
+  log("User Address: " + address);
+  log("Mnemonic: " + mnemonic);
   log("Logging in as User " + user_index);
 
   // Supports Metamask and Mist, and other wallets that provide 'web3'
@@ -685,51 +820,13 @@ function walletLogin() {
   // Get address balance
   web3.eth.getBalance(address, function(err, result){
     if(!hasError(err)) {
-      elem('balance').innerHTML = web3.fromWei(result, 'ether');
+      elem('balance').innerHTML = web3.fromWei(result, 'ether') + ' ether';
     }
   });
 
-  checkForUser();
-
-  // Show data on page
-  elem('address').innerHTML = address;
-  elem('mnemonic').innerHTML = mnemonic;
-}
-
-/* MAIN LOAD EVENT */
-window.addEventListener('load', function() {
-  // Start logger
-  elem('logger').innerHTML = "Ethereum Identity 1.0";
-
-  // Check for mobile device http://stackoverflow.com/a/14283643
-  if(('ontouchstart' in window || 'onmsgesturechange' in window) && window.screenX === 0)
-    elem('scanner').href = "zxing://scan/?ret=" + 
-      encodeURIComponent(location.protocol + '//' + location.host 
-      + location.pathname + "?code={CODE}"
-    );
-  else
-    elem('scanner').addEventListener('click', function(event) {
-      showDesktopQR();
-    });
-
-  // Set sweetalert defaults
-  swal.setDefaults({
-    reverseButtons: true
-  });
-
-  // Generate Wallet
-  uuid = localStorage.getItem('identity_address');
-  user_index = localStorage.getItem('user_index') || getRandomId().toString();
-  mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
-  wallet = generateWallet(mnemonic, user_index);
-  address = "0x" + wallet.getAddress().toString("hex");
-
-  log("User Address: " + address);
-  log("Mnemonic: " + mnemonic);
-
   // Login to wallet
   if(uuid && localStorage.getItem('user_index')){
-    walletLogin();
+    checkForUser();
   } else {
     localStorage.setItem('user_index', user_index);
     showSignUpPopup();
@@ -750,10 +847,10 @@ window.addEventListener('load', function() {
         showCancelButton: true
       }).then(function() {
           contact.parentElement.removeChild(contact);
+          setRecoveryContacts();
       }).catch(swal.noop);
-  });
-  elem('setContacts').addEventListener('click', function(event) {
-    setRecoveryContacts();
+    else if(event.target.dataset.action == 'contact-card')
+      showContactPopup(event.target.nextSibling.innerHTML, contact.dataset.uuid);
   });
   elem('menu').addEventListener('click', function(event) {
     var prev = elem('menu').getElementsByClassName('active')[0];
@@ -769,7 +866,7 @@ window.addEventListener('load', function() {
     addAttributeFormRow('', '', [], true);
   });
   elem('qrcode').addEventListener('click', function(event) {
-    showContactRequestPopup();
+    showContactPopup(user_name, uuid);
   });
   elem('attributes').addEventListener('click', function(event) {
     var attr = event.target.parentElement.parentElement;
@@ -793,7 +890,11 @@ window.addEventListener('load', function() {
     }
   });
   document.addEventListener('click', function(event) {
-    if(event.target.dataset.action === 'recover')
+    if(event.target.dataset.action === 'recover-account')
       showRecoveryPopup();
+    else if(event.target.dataset.action === 'recovery-scanner'){
+      elem('recovery-info').innerHTML = desktopQRElement();
+      startVideo(receiveRecoveryScan);
+    }
   });
 });
