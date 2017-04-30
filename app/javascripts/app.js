@@ -201,8 +201,8 @@ function performQRAction(parsed, action) {
     swal({
       title: "Signature Request",
       html: 'User: <strong>' + parsed.owner + '</strong><br /><br />' +
-        '<div class="ui form">' + 
-        '<div class="inline field"><label>Attribute</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
+        '<div class="ui form">' +
+        '<div class="inline field"><label>Attribute</label><input type="text" value="' + parsed.key + '" disabled /></div>' +
         '<div class="inline field"><label>Value</label><input type="text" value="' + parsed.value + '" disabled /></div>' +
         '</div>',
       showCancelButton: true,
@@ -217,8 +217,8 @@ function performQRAction(parsed, action) {
     swal({
       title: "Recovery Request",
       html: 'User: <strong>' + parsed.uuid + '</strong><br /><br />' +
-        '<div class="ui form" id="recovery-request">' + 
-          '<div class="field"><label>Proposed Key</label><input type="text" value="' + parsed.key + '" disabled /></div>' + 
+        '<div class="ui form" id="recovery-request">' +
+          '<div class="field"><label>Proposed Key</label><input type="text" value="' + parsed.key + '" disabled /></div>' +
         '</div><br /><div id="signup_log"></div>',
       showCancelButton: true,
       cancelButtonText: 'Cancel',
@@ -285,8 +285,8 @@ function showRecoveryPopup() {
     title: 'Select an Account',
     input: 'text',
     html: '<div id="recovery-info"><p>To recover your account, scan your contact card from a friends device or enter your UUID manually.' +
-    '</p><button class="ui button" data-action="recovery-scanner">Open Scanner</button>' + 
-    '<br /><br />or' + 
+    '</p><a id="recovery-scanner" class="ui button">Open Scanner</a>' +
+    '<br /><br />or' +
     '</div>',
     inputValidator: function(input) {
       return new Promise(function(resolve, reject) {
@@ -311,7 +311,18 @@ function showRecoveryPopup() {
     showCancelButton: true,
     showLoaderOnConfirm: true,
     confirmButtonText: 'Next &rarr;',
-    progressSteps: ['1', '2', '3']
+    progressSteps: ['1', '2', '3'],
+    onOpen: function () {
+      if(isMobile())
+        elem('recovery-scanner').href = "zxing://scan/?ret=" +
+          encodeURIComponent(location.protocol + '//' + location.host
+          + location.pathname + "?code={CODE}&recovery");
+      else
+        elem('recovery-scanner').addEventListener('click', function(event) {
+          elem('recovery-info').innerHTML = desktopQRElement();
+          startVideo(receiveRecoveryScan);
+        });
+    }
   }]).then(function (result) {
     setContract('Identity', uuid);
     elem('details').style.display = "block";
@@ -331,12 +342,12 @@ function updateRecoverAccountPopup() {
   resolveModal();
   swal.insertQueueStep({
     title: 'Confirm Details',
-    html: '<p>Make sure the details below look correct.</p>' + 
+    html: '<p>Make sure the details below look correct.</p>' +
       '<div class="ui card contact grid container">' +
         '<div class="content">' +
-          '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' + 
-          '<div class="header">' + elem('name').textContent + '</div>' + 
-          '<div class="meta overflow-ellipsis">' + uuid + '</div>' + 
+          '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+          '<div class="header">' + elem('name').textContent + '</div>' +
+          '<div class="meta overflow-ellipsis">' + uuid + '</div>' +
         '</div>' +
       '</div>',
     allowOutsideClick: false,
@@ -348,7 +359,7 @@ function updateRecoverAccountPopup() {
   });
   swal.insertQueueStep({
     title: 'Request Recovery',
-    html: '<p>Ask you contacts to scan the code below.</p>' + 
+    html: '<p>Ask you contacts to scan the code below.</p>' +
       getQRFromJson({
         action: 'recover',
         uuid: uuid,
@@ -378,8 +389,8 @@ function showSignUpPopup() {
     input: 'text',
     customClass: 'signup-modal',
     html: '<div id="signup_log"><br />' +
-    '<button class="ui button" data-action="recover-account">Recover Account</button>' + 
-    '<br /><br />or' + 
+    '<button class="ui button" data-action="recover-account">Recover Account</button>' +
+    '<br /><br />or' +
     '</div>',
     inputPlaceholder: 'Enter your name...',
     confirmButtonText: 'Sign Up',
@@ -551,7 +562,8 @@ function getAttributes(hash, callback) {
         }
         // Check for incoming code
         var code = getUrlParameter('code');
-        if (code)
+        var recovery = getUrlParameter('recovery');
+        if (code && !recovery)
           getQRCodeResult(code, performQRAction);
         // Check for callback
         if (callback) callback();
@@ -650,7 +662,7 @@ function addAttributeIDElem(name, value, signer, signature) {
         '<button id="ipfs-attr-sign" class="mini ui basic grey button">Sign</button>' +
         '<button id="ipfs-attr-verify" class="mini ui basic grey button" data-signature="' + signature + '">Verify</button>' +
         '<span class="unverified">Unverified</span>'
-      '</div>' + 
+      '</div>' +
     '</div>';
 }
 
@@ -699,9 +711,9 @@ function addContact(addr) {
     '<div class="card contact" data-uuid="' + addr + '">' +
       '<div class="content">' +
         '<i class="right floated delete icon red" data-action="delete"></i>' +
-        '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' + 
-        '<div class="header">' + 'Contact' + '</div>' + 
-        '<div class="meta overflow-ellipsis">' + addr + '</div>' + 
+        '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+        '<div class="header">' + 'Contact' + '</div>' +
+        '<div class="meta overflow-ellipsis">' + addr + '</div>' +
       '</div>' +
     '</div>';
 }
@@ -718,7 +730,7 @@ function log(msg) {
   var logger = elem("logger");
   logger.innerHTML += '<br />' + (msg.toString().match(/error/i) ? '<span class="err">' + msg + '</span>' : msg);
   logger.scrollTop = logger.scrollHeight;
-  if(user_resolve)
+  if(elem("signup_log"))
     elem("signup_log").innerHTML = msg;
 }
 
@@ -750,7 +762,7 @@ function resetUrl() {
 }
 
 function getQRFromJson(json) {
-  return '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' + 
+  return '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' +
     encodeURIComponent(JSON.stringify(json)) + '">';
 }
 
@@ -798,8 +810,8 @@ window.addEventListener('load', function() {
 
   // Check for mobile device http://stackoverflow.com/a/14283643
   if(isMobile())
-    elem('scanner').href = "zxing://scan/?ret=" + 
-      encodeURIComponent(location.protocol + '//' + location.host 
+    elem('scanner').href = "zxing://scan/?ret=" +
+      encodeURIComponent(location.protocol + '//' + location.host
       + location.pathname + "?code={CODE}"
     );
   else
@@ -847,7 +859,11 @@ window.addEventListener('load', function() {
     checkForUser();
   } else {
     localStorage.setItem('user_index', user_index);
-    showSignUpPopup();
+    if (getUrlParameter('recovery')){
+      showRecoveryPopup();
+      getQRCodeResult(getUrlParameter('code'), receiveRecoveryScan);
+    } else
+      showSignUpPopup();
   }
 
   // Add button event listeners
@@ -910,9 +926,5 @@ window.addEventListener('load', function() {
   document.addEventListener('click', function(event) {
     if(event.target.dataset.action === 'recover-account')
       showRecoveryPopup();
-    else if(event.target.dataset.action === 'recovery-scanner'){
-      elem('recovery-info').innerHTML = desktopQRElement();
-      startVideo(receiveRecoveryScan);
-    }
   });
 });
