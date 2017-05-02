@@ -301,7 +301,7 @@ function performQRAction(parsed, type) {
         getAttributes(result[1], updateDisclosurePopup)
     });
   } else if (type === "signature-result") {
-    var attributes = document.getElementsByClassName('attribute');
+    var attributes = elem('attributes').getElementsByClassName('attribute');
     var added = false;
     for (var att of attributes){
       var inputs = att.getElementsByTagName('input');
@@ -745,11 +745,11 @@ function addSignatureToFormRow(key, value, sig, attribute) {
 function getElementsFromForm() {
   var attributes = {};
   var signatures = {};
-  var elements = document.getElementsByClassName('attribute');
-  for (var elem of elements){
-    var inputs = elem.getElementsByTagName('input');
+  var elements = elem('attributes').getElementsByClassName('attribute');
+  for (var att of elements){
+    var inputs = att.getElementsByTagName('input');
     attributes[inputs[0].value] = inputs[1].value;
-    var sig_elements = elem.getElementsByClassName('signature');
+    var sig_elements = att.getElementsByClassName('signature');
     signatures[inputs[0].value] = [];
     for (var sig of sig_elements)
       if(inputs[0].value == sig.dataset.key &&
@@ -805,19 +805,29 @@ function deployContract(contract_name, callback) {
 
 /* CONTACTS ELEMENT FUNCTIONS */
 function addContact(addr) {
-  elem("contacts").innerHTML +=
-    '<div class="card contact" data-uuid="' + addr + '">' +
-      '<div class="content">' +
-        '<i class="right floated delete icon red link" data-action="delete"></i>' +
-        '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
-        '<div class="header">' + 'Contact' + '</div>' +
-        '<div class="meta overflow-ellipsis">' + addr + '</div>' +
-      '</div>' +
-    '</div>';
+  // Create contact element
+  var contact = document.createElement('div');
+  contact.className = 'card contact';
+  contact.dataset.uuid = addr;
+  contact.innerHTML = '<div class="content">' +
+    '<i class="right floated delete icon red link" data-action="delete"></i>' +
+    '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+    '<div class="header">' + 'Contact' + '</div>' +
+    '<div class="meta overflow-ellipsis">' + addr + '</div>' +
+  '</div>';
+  elem('contacts').appendChild(contact);
+
+  // Get name of contact
+  var name = contact.getElementsByClassName('header')[0];
+  fetchIdentity(addr, function(result) {
+    getAttributes(result[1], function(data) {
+      name.textContent = data.attributes.name;
+    });
+  });
 }
 
 function getContactElements() {
-  var contacts = document.getElementsByClassName('contact');
+  var contacts = elem('contacts').getElementsByClassName('contact');
   var contacts_arr = [].slice.call(contacts);
   return contacts_arr.map(function(elem) { return elem.dataset.uuid; });
 }
