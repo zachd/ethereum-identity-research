@@ -10,7 +10,6 @@
 <body>
   <div class="ui segment">
     <div class="ui container">
-      <a id="scanner" class="ui right floated button">Open Scanner</a>
       <h1>Identity</h1>
       <div id="menu" class="ui four item tabs menu">
         <a class="active item" data-tab="profile-tab">Profile</a>
@@ -32,8 +31,12 @@
           Recovery: <span id="recovery"> (none)</span><br />
           IPFS Hash: <span id="ipfshash"> (none)</span><br />
         </h4>
-        <a id="send-request" class="ui button"><i class="icon send outline"></i> Send Request</a>
       </div>
+    </div>
+    <br /><br />
+    <div class="ui grid container actions">
+      <a id="send-request" class="ui button"><i class="icon send outline"></i> Send Request</a>
+      <a id="scanner" class="ui button"><i class="icon camera"></i> Open Scanner</a>
     </div>
   </div>
   <div id="attributes-tab" class="ui tab">

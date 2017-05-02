@@ -102,6 +102,8 @@ textarea {
   padding-right: 20px;
 }
 
-.contact .image {
-  border-radius: 3px;
+@media only screen and (max-width: 767px) {
+  .container.actions .button {
+    width: 48%;
+  }
 }

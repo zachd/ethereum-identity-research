@@ -64,6 +64,7 @@ function showIdentity(result, callback) {
   if(result[0] > 0){
     // Update profile box
     elem('uuid').innerHTML = uuid + ' (User ' + user_index + ')';
+    elem('qrcode').src = getContactQR(uuid, 100);
     elem('owner').innerHTML = result[0];
     elem('ipfshash').innerHTML = result[1] || '(none)';
     elem('recovery').innerHTML = result[2];
@@ -502,11 +503,15 @@ function showContactPopup(title, contact_uuid) {
   swal({
     title: title,
     html:
-      '<img src="http://chart.apis.google.com/chart?cht=qr&chs=350x350&chl=' + encodeURIComponent(
-        JSON.stringify({type: 'contact-card', uuid: contact_uuid})
-      ) + '" style="width: 300px; height: 300px" />',
+      '<img src="' + getContactQR(contact_uuid, '350') + '" style="width: 300px; height: 300px" />',
     showCloseButton: true
   }).catch(swal.noop);
+}
+
+function getContactQR(contact_uuid, size) {
+  return 'http://chart.apis.google.com/chart?cht=qr&chs=' + size + 'x' + size + '&chl=' + encodeURIComponent(
+    JSON.stringify({type: 'contact-card', uuid: contact_uuid})
+  );
 }
 
 function showAttributeRequestPopup() {
@@ -811,7 +816,7 @@ function addContact(addr) {
   contact.dataset.uuid = addr;
   contact.innerHTML = '<div class="content">' +
     '<i class="right floated delete icon red link" data-action="delete"></i>' +
-    '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+    '<img class="left floated mini ui image" src="' + getContactQR(addr, 50) + '" data-action="contact-card">' +
     '<div class="header">' + 'Contact' + '</div>' +
     '<div class="meta overflow-ellipsis">' + addr + '</div>' +
   '</div>';
