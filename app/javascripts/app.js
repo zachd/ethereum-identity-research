@@ -34,6 +34,7 @@ var contracts = {}
 var user_index;
 var user_name;
 var user_resolve = null;
+var user_challenge;
 var mnemonic;
 var wallet;
 var address;
@@ -283,15 +284,34 @@ function performQRAction(parsed, type) {
     swal.showLoading();
     fetchIdentity(parsed.uuid, updateRecoveryRequestPopup);
   } else if(type === "disclosure-result"){
-     swal({
+    swal({
       title: "Disclosure Result",
-      html: '<div class="ui card contact centered">' +
-          '<div class="content">' +
-            '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
-            '<div id="disclosure-user" class="header"></div>' +
-            '<div class="meta overflow-ellipsis">' + parsed.uuid + '</div>' +
-          '</div>' +
-        '</div>'
+      html: '<p></p><div class="ui card contact centered">' +
+        '<div class="content">' +
+          '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+          '<div id="disclosure-user" class="header"></div>' +
+          '<div class="meta overflow-ellipsis">' + parsed.uuid + '</div>' +
+        '</div>' +
+        '<div id="disclosure-attributes" class="extra content">' +'</div>' +
+        '<p id="disclosure-challenge"></p>' +
+      '</div>',
+      onOpen: function() {
+        for(var att in parsed.attributes) {
+          if(parsed.attributes.hasOwnProperty(att)) {
+            var div = document.createElement('div');
+            div.className = "ui label";
+            div.innerHTML = '<i class="tag icon"></i> ' + att +
+            '<div class="detail">' + parsed.attributes[att].value + '</div>' +
+            '<div class="content"></div>';
+            elem('disclosure-attributes').appendChild(div);
+            var content = div.getElementsByClassName('content')[0];
+            parsed.attributes[att].signatures.map(function(sig) {
+              verifyDisclosedSignature(parsed.uuid, att, parsed.attributes[att].value, sig, content);
+            });
+          }
+        }
+        verifyDisclosureChallenge(parsed.uuid, user_challenge, parsed.signature, elem('disclosure-challenge'));
+      }
     }).then(function() {
       resetUrl();
     }, function(dismiss) {
@@ -301,6 +321,7 @@ function performQRAction(parsed, type) {
     fetchIdentity(parsed.uuid, function(result) {
         getAttributes(result[1], updateDisclosurePopup)
     });
+
   } else if (type === "signature-result") {
     var attributes = elem('attributes').getElementsByClassName('attribute');
     var added = false;
@@ -329,6 +350,37 @@ function performQRAction(parsed, type) {
   }
 }
 
+function verifyDisclosureChallenge(addr, challenge, sig, container) {
+  var signing_addr = verifyAttribute(challenge, sig);
+  fetchIdentity(addr, function(result) {
+    getAttributes(result[1], function(data) {
+      if (result[0] === signing_addr){
+        container.innerHTML = '<span class="verified"><i class="ui icon checkmark"></i> Challenge passed</span>';
+        user_challenge = null;
+      }
+      else
+        container.innerHTML = '<span class="unverified"><i class="ui icon warning sign"></i> Challenge failed</span>';
+    });
+  });
+}
+
+function verifyDisclosedSignature(addr, key, value, sig, container) {
+  var json = JSON.stringify({
+    uuid: addr,
+    key: key,
+    value: value
+  });
+  var signing_addr = verifyAttribute(json, sig.signature);
+  fetchIdentity(sig.signer, function(result) {
+    getAttributes(result[1], function(data) {
+      if (result[0] === signing_addr)
+        container.innerHTML += '<div class="verified"><i class="ui icon checkmark"></i> Signed by ' + data.attributes.name + '</div>';
+      else
+        container.innerHTML += '<div class="unverified"><i class="ui icon warning sign"></i> Expired sig by ' + data.attributes.name + '</div>';
+    });
+  });
+}
+
 function updateDisclosurePopup(data) {
   swal.hideLoading();
   elem('disclosure-user').textContent = data.attributes.name;
@@ -355,7 +407,7 @@ function showRecoveryPopup() {
     input: 'text',
     html: '<div id="recovery-info"><p>To recover your account, scan your contact card from a friends device or enter your UUID manually.' +
     '</p><a id="recovery-scanner" class="ui button">Open Scanner</a>' +
-    '<br /><br />or' +
+    '<br /><div class="ui horizontal divider">Or</div>' +
     '</div>',
     inputValidator: function(input) {
       return new Promise(function(resolve, reject) {
@@ -462,7 +514,7 @@ function showSignUpPopup() {
     customClass: 'signup-modal',
     html: '<div id="signup_log"><br />' +
     '<button class="ui button" data-action="recover-account">Recover Account</button>' +
-    '<br /><br />or' +
+    '<br /><br /><div class="ui horizontal divider">Or</div>' +
     '</div>',
     inputPlaceholder: 'Enter your name...',
     confirmButtonText: 'Sign Up',
@@ -489,7 +541,6 @@ function showSignUpPopup() {
 
 function showSigningResultPopup(input) {
   delete input.type;
-  input.signer = uuid;
   var signature = signAttribute(JSON.stringify(input));
   var result = {
     type: 'signature-result', signer: uuid,
@@ -531,11 +582,17 @@ function showAttributeRequestPopup() {
     var attributes = [].slice.call(inputs).map(function(elem) {
       return elem.value;
     });
+    user_challenge = uuid_gen.v4();
+    if(isMobile())
+      elem('scanner').href = "zxing://scan/?ret=" +
+        encodeURIComponent(location.protocol + '//' + location.host
+        + location.pathname + "?code={CODE}&challenge=" + user_challenge
+      );
     showQRPopup('Request Attributes', {
       type: 'attribute-request',
       attributes: attributes,
       uuid: uuid,
-      challenge: uuid_gen.v4()
+      challenge: user_challenge
     }, true);
   }).catch(swal.noop);
 }
@@ -649,6 +706,8 @@ function getAttributes(hash, callback) {
       stream.on('end', function(){
         // Update attributes form
         var data = JSON.parse(file.toString());
+        // Check for callback
+        if (callback) callback(data);
         // Check for incoming code
         if(!swal.isVisible()){
           var code = getUrlParameter('code');
@@ -656,8 +715,6 @@ function getAttributes(hash, callback) {
           if (code && !recovery)
             getQRCodeResult(code, performQRAction);
         }
-        // Check for callback
-        if (callback) callback(data);
       });
     }
   });
@@ -688,7 +745,8 @@ function signAttribute(attribute) {
 function verifyAttribute(attribute, RPCsig) {
   var hash = ethUtils.sha3(attribute);
   var sig = ethUtils.fromRpcSig(RPCsig);
-  return ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
+  var pubkey = ethUtils.ecrecover(hash, sig.v, sig.r, sig.s);
+  return '0x' + ethUtils.publicToAddress(pubkey).toString('hex');
 }
 
 function setVerified(element, result) {
@@ -939,6 +997,7 @@ window.addEventListener('load', function() {
 
   // Generate Wallet
   uuid = localStorage.getItem('identity_address');
+  user_challenge = getUrlParameter('challenge');
   user_index = localStorage.getItem('user_index') || getRandomId().toString();
   mnemonic = localStorage.getItem('mnemonic') || DEFAULT_MNEMONIC || generateMnemonic();
   wallet = generateWallet(mnemonic, user_index);

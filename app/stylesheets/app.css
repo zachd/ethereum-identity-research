@@ -82,6 +82,14 @@ textarea {
 }
 
 /* EXTRA */
+#disclosure-attributes {
+  text-align: left;
+}
+
+#disclosure-attributes .content {
+  margin-top: 5px;
+}
+
 .attribute:first-child .delete.icon {
   visibility: hidden;
 }
