@@ -1,4 +1,5 @@
 const Web3 = require("web3");
+const uuid_gen = require("uuid");
 const swal = require('sweetalert2');
 var qrcode = require('jsqrcode');
 require("../stylesheets/app.css");
@@ -22,7 +23,7 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 // Global settings
 const NUM_ACCOUNTS = 100;
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const DEFAULT_MNEMONIC = "scrap unhappy curtain plate oppose property nasty solve shoulder net winner also";
+const DEFAULT_MNEMONIC = "mixed aisle dry space raven engine rule include shuffle mouse parade stereo";
 
 // Contract variables
 var uuid;
@@ -47,8 +48,7 @@ var profile = {
 
 /* IDENTITY FUNCTIONS */
 function getIdentity() {
-  elem('uuid').innerHTML = uuid + ' (User ' + user_index + ')';
-  fetchIdentity(uuid, showIdentity);
+  fetchIdentity(uuid, showIdentity, writeAttributes);
 }
 
 function fetchIdentity(contract_address, callback, params) {
@@ -63,11 +63,11 @@ function fetchIdentity(contract_address, callback, params) {
 function showIdentity(result, callback) {
   if(result[0] > 0){
     // Update profile box
+    elem('uuid').innerHTML = uuid + ' (User ' + user_index + ')';
     elem('owner').innerHTML = result[0];
     elem('ipfshash').innerHTML = result[1] || '(none)';
     elem('recovery').innerHTML = result[2];
     elem('attributes').innerHTML = '';
-    elem('ipfs-attributes').innerHTML = '';
     // Update attributes section
     if(result[1])
       getAttributes(result[1], callback);
@@ -76,9 +76,10 @@ function showIdentity(result, callback) {
       setContract('Recovery', result[2]);
       getRecoveryContacts();
     }
-    if(!callback){
+    if(address == result[0])
       elem('details').style.display = 'block';
-    }
+    else
+      showSignUpPopup();
   }
 }
 
@@ -88,7 +89,7 @@ function setIPFSHash(hash) {
     if(!hasError(err)) {
       log("IPFS hash updated successfully.");
       elem("ipfshash").innerHTML = hash || '(none)';
-      getAttributes(hash);
+      getAttributes(hash, writeAttributes);
     }
   });
 }
@@ -116,9 +117,11 @@ function getNumRecoveries(proposed_key) {
 }
 
 function checkRecoveryKey(result) {
-  if(address === result[0])
+  if(address === result[0]){
+    showIdentity(result, writeAttributes);
+    resetUrl();
     resolveModal();
-  else
+  } else
     swal.hideLoading();
 }
 
@@ -171,36 +174,36 @@ function registerUUID(contract_address) {
 function showRequestAttestationPopup(elem) {
   var inputs = elem.getElementsByTagName('input');
   var json = {
-    action: "sign",
-    owner: uuid,
+    type: "signature-request",
+    uuid: uuid,
     key: inputs[0].value,
     value: inputs[1].value
   };
-  showQRPopup('Request Attestation', json, true);
+  showQRPopup('Request Signature', json, true);
 }
 
 function getQRCodeResult(result, callback) {
-  var parsed, action;
-  var input = decodeURIComponent(result).replace('+', ' ');
+  var parsed, type;
+  var input = decodeURIComponent(result).replace(/\+/g, ' ');
 
   // Parse QR code result
   try {
     parsed = JSON.parse(input);
-    action = parsed.action;
+    type = parsed.type;
   } catch(e) {}
-  callback(parsed, action);
+  callback(parsed, type);
 }
 
-function performQRAction(parsed, action) {
+function performQRAction(parsed, type) {
   // Stop video stream
   if(window.localMediaStream)
     stopVideo();
 
   // Perform parsed action
-  if(action === "sign"){
+  if(type === "signature-request"){
     swal({
       title: "Signature Request",
-      html: 'User: <strong>' + parsed.owner + '</strong><br /><br />' +
+      html: 'User: <strong>' + parsed.uuid + '</strong><br /><br />' +
         '<div class="ui form">' +
         '<div class="inline field"><label>Attribute</label><input type="text" value="' + parsed.key + '" disabled /></div>' +
         '<div class="inline field"><label>Value</label><input type="text" value="' + parsed.value + '" disabled /></div>' +
@@ -213,7 +216,48 @@ function performQRAction(parsed, action) {
     }, function(dismiss) {
       resetUrl();
     });
-  } else if(action === "recover"){
+  } else if(type === "attribute-request"){
+     swal({
+      title: "Disclosure Request",
+      html: '<p>The following user is requesting attributes:</p>' +
+        '<div class="ui card contact centered">' +
+          '<div class="content">' +
+            '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+            '<div id="disclosure-user" class="header"></div>' +
+            '<div class="meta overflow-ellipsis">' + parsed.uuid + '</div>' +
+          '</div>' +
+        '</div><br />' +
+        '<p>Attributes: ' + parsed.attributes.map(function(attr) {
+          return '<span class="ui label"><i class="tag icon"></i> ' + attr + '</span>';
+        }).join('') + '</p>',
+      showCancelButton: true,
+      cancelButtonText: 'Cancel',
+      confirmButtonText: '<i class="ui icon checkmark"></i> Disclose',
+      showLoaderOnConfirm: true
+    }).then(function() {
+      var response = {};
+      var elements = getElementsFromForm();
+      for (var att of parsed.attributes){
+        response[att] = {
+          value: elements.attributes[att],
+          signatures: elements.signatures[att]
+        }
+      }
+      showQRPopup('Disclosure Result', {
+        type: 'disclosure-result',
+        attributes: response,
+        uuid: uuid,
+        signature: signAttribute(parsed.challenge)
+      });
+      resetUrl();
+    }, function(dismiss) {
+      resetUrl();
+    });
+    swal.showLoading();
+    fetchIdentity(parsed.uuid, function(result) {
+        getAttributes(result[1], updateDisclosurePopup)
+    });
+  } else if(type === "recovery-request"){
     swal({
       title: "Recovery Request",
       html: 'User: <strong>' + parsed.uuid + '</strong><br /><br />' +
@@ -237,13 +281,32 @@ function performQRAction(parsed, action) {
     });
     swal.showLoading();
     fetchIdentity(parsed.uuid, updateRecoveryRequestPopup);
-  } else if (action === "save") {
+  } else if(type === "disclosure-result"){
+     swal({
+      title: "Disclosure Result",
+      html: '<div class="ui card contact centered">' +
+          '<div class="content">' +
+            '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
+            '<div id="disclosure-user" class="header"></div>' +
+            '<div class="meta overflow-ellipsis">' + parsed.uuid + '</div>' +
+          '</div>' +
+        '</div>'
+    }).then(function() {
+      resetUrl();
+    }, function(dismiss) {
+      resetUrl();
+    });
+    swal.showLoading();
+    fetchIdentity(parsed.uuid, function(result) {
+        getAttributes(result[1], updateDisclosurePopup)
+    });
+  } else if (type === "signature-result") {
     var attributes = document.getElementsByClassName('attribute');
     var added = false;
     for (var att of attributes){
       var inputs = att.getElementsByTagName('input');
       if(inputs[0].value === parsed.key && inputs[1].value === parsed.value) {
-        addSignatureToFormRow({signer: parsed.signer, signature: parsed.signature}, att);
+        addSignatureToFormRow(parsed.key, parsed.value, {signer: parsed.signer, signature: parsed.signature}, att);
         added = true;
       }
     }
@@ -252,7 +315,7 @@ function performQRAction(parsed, action) {
     else
       hasError('Error: Attribute does not exist on profile');
     resetUrl();
-  } else if (action === "contact") {
+  } else if (type === "contact-card") {
     if(getContactElements().indexOf(parsed.uuid) > -1){
       hasError('Error: Contact already exists');
     } else {
@@ -265,13 +328,18 @@ function performQRAction(parsed, action) {
   }
 }
 
+function updateDisclosurePopup(data) {
+  swal.hideLoading();
+  elem('disclosure-user').textContent = data.attributes.name;
+}
+
 function updateRecoveryRequestPopup(result) {
   swal.hideLoading();
   elem('recovery-request').dataset.recovery = result[2];
 }
 
-function receiveRecoveryScan(parsed, action) {
-  if(action === "contact" && parsed.uuid){
+function receiveRecoveryScan(parsed, type) {
+  if(type === "contact-card" && parsed.uuid){
     swal.getInput().value = parsed.uuid;
     swal.clickConfirm();
   } else {
@@ -301,7 +369,10 @@ function showRecoveryPopup() {
       return new Promise(function (resolve, reject) {
         user_resolve = resolve;
         uuid = swal.getInput().value;
-        fetchIdentity(uuid, showIdentity, updateRecoverAccountPopup);
+        fetchIdentity(uuid, showIdentity, function(data) {
+          writeAttributes(data);
+          updateRecoverAccountPopup();
+        });
       })
     },
     customClass: 'recovery-modal',
@@ -361,7 +432,7 @@ function updateRecoverAccountPopup() {
     title: 'Request Recovery',
     html: '<p>Ask you contacts to scan the code below.</p>' +
       getQRFromJson({
-        action: 'recover',
+        type: 'recovery-request',
         uuid: uuid,
         key: address
       }) + '<br /><span id="num-recoveries"></span> / <span id="total-recoveries"></span> recoveries',
@@ -416,11 +487,11 @@ function showSignUpPopup() {
 }
 
 function showSigningResultPopup(input) {
-  delete input.action;
+  delete input.type;
   input.signer = uuid;
   var signature = signAttribute(JSON.stringify(input));
   var result = {
-    action: 'save', signer: uuid, 
+    type: 'signature-result', signer: uuid,
     key: input.key, value: input.value,
     signature: signature
   };
@@ -432,12 +503,37 @@ function showContactPopup(title, contact_uuid) {
     title: title,
     html:
       '<img src="http://chart.apis.google.com/chart?cht=qr&chs=350x350&chl=' + encodeURIComponent(
-        JSON.stringify({action: 'contact', uuid: contact_uuid})
+        JSON.stringify({type: 'contact-card', uuid: contact_uuid})
       ) + '" style="width: 300px; height: 300px" />',
     showCloseButton: true
   }).catch(swal.noop);
 }
 
+function showAttributeRequestPopup() {
+  swal({
+    title: 'Request Attributes',
+    html: '<p>Select some attributes below to create a request.</p>' +
+      '<div id="attribute-requests" class="ui form"></div>' +
+      '<br /><a id="add-attr-request" class="ui positive mini basic button" ' +
+      'data-action="add-request">Add Attribute</a>',
+    showCancelButton: true,
+    confirmButtonText: 'Create',
+    onOpen: function() {
+      elem('add-attr-request').click();
+    }
+  }).then(function() {
+    var inputs = elem('attribute-requests').getElementsByClassName('attribute');
+    var attributes = [].slice.call(inputs).map(function(elem) {
+      return elem.value;
+    });
+    showQRPopup('Request Attributes', {
+      type: 'attribute-request',
+      attributes: attributes,
+      uuid: uuid,
+      challenge: uuid_gen.v4()
+    }, true);
+  }).catch(swal.noop);
+}
 
 function showQRPopup(title, json, show_scanner) {
   swal({
@@ -548,28 +644,31 @@ function getAttributes(hash, callback) {
       stream.on('end', function(){
         // Update attributes form
         var data = JSON.parse(file.toString());
-        elem('attributes').innerHTML = '';
-        elem('ipfs-attributes').innerHTML = '';
-        for (var att in data.attributes){
-          if (data.attributes.hasOwnProperty(att)){
-            if(att === "name") {
-              user_name = data.attributes[att];
-              elem('name').innerHTML = data.attributes[att];
-            }
-            addAttributeFormRow(att, data.attributes[att], data.signatures[att]);
-            addAttributeIDElem(att, data.attributes[att], data.signatures[att]);
-          }
-        }
         // Check for incoming code
-        var code = getUrlParameter('code');
-        var recovery = getUrlParameter('recovery');
-        if (code && !recovery)
-          getQRCodeResult(code, performQRAction);
+        if(!swal.isVisible()){
+          var code = getUrlParameter('code');
+          var recovery = getUrlParameter('recovery');
+          if (code && !recovery)
+            getQRCodeResult(code, performQRAction);
+        }
         // Check for callback
-        if (callback) callback();
+        if (callback) callback(data);
       });
     }
   });
+}
+
+function writeAttributes(data){
+  elem('attributes').innerHTML = '';
+  for (var att in data.attributes){
+    if (data.attributes.hasOwnProperty(att)){
+      if(att === "name") {
+        user_name = data.attributes[att];
+        elem('name').innerHTML = data.attributes[att];
+      }
+      addAttributeFormRow(att, data.attributes[att], data.signatures[att]);
+    }
+  }
 }
 
 
@@ -595,38 +694,52 @@ function setVerified(element, result) {
 
 
 /* ATTRIBUTE ELEMENT FUNCTIONS */
-function addAttributeFormRow(name, value, signatures, empty){
+function addAttributeFormRow(key, value, signatures, empty){
   var container = elem('attributes');
   var attribute = document.createElement('div');
   attribute.className = 'card attribute';
   attribute.innerHTML =
     '<div class="content">' +
-      '<i class="right floated delete icon red" data-action="delete"></i>' +
-      '<div class="inline field"><input type="text" value="' + name + '"' 
-        + (name === "name" ? 'disabled' : '') +'></div>' +
+      '<i class="right floated delete icon red link" data-action="delete"></i>' +
+      '<div class="inline field"><input type="text" value="' + key + '"'
+        + (key === "name" ? 'disabled' : '') +'></div>' +
       '<div class="description field"><input type="text" value="' + value + '"></div>' +
       '<div class="signatures verified"></div>' +
     '</div>' +
     '<div class="extra content">' +
       '<span class="left floated lh-two"><span class="num-attestations">0</span> Attestations</span>' +
       '<span class="right floated"><button class="ui button primary mini" data-action="sign" ' +
-      (empty ? 'disabled' : '') + '>Request Attestation</button></span>' +
+      (empty ? 'disabled' : '') + '>Request Signature</button></span>' +
     '</div>';
 
   // Add signatures
   for (var sig of signatures)
-    addSignatureToFormRow(sig, attribute);
+    addSignatureToFormRow(key, value, sig, attribute);
 
   // Append to attribute container
   container.appendChild(attribute);
 }
 
-function addSignatureToFormRow(sig, attribute) {
-  attribute.getElementsByClassName('signatures')[0].innerHTML += 
-    '<div class="signature overflow-ellipsis" data-signer="' + sig.signer + '" data-signature="' + sig.signature + '">' +
-    '<i class="ui icon checkmark"></i> Signed by <span class="signer ">' + sig.signer + '</span></div>';
+function addSignatureToFormRow(key, value, sig, attribute) {
+  // Show element
+  var element = document.createElement('div');
+  element.className = 'signature overflow-ellipsis';
+  element.dataset.signer = sig.signer;
+  element.dataset.signature = sig.signature;
+  element.dataset.key = key;
+  element.dataset.value = value;
+  element.title = sig.signer;
+  element.innerHTML = '<i class="ui icon checkmark"></i> Signed by ' + sig.signer;
+  attribute.getElementsByClassName('signatures')[0].appendChild(element);
+  // Add to counter
   var counter = attribute.getElementsByClassName('num-attestations')[0];
   counter.innerHTML = parseInt(counter.innerHTML) + 1;
+  // Get name of signer
+  fetchIdentity(sig.signer, function(result) {
+    getAttributes(result[1], function(data) {
+      element.innerHTML = '<i class="ui icon checkmark"></i> Signed by ' + data.attributes.name;
+    });
+  });
 }
 
 function getElementsFromForm() {
@@ -638,34 +751,19 @@ function getElementsFromForm() {
     attributes[inputs[0].value] = inputs[1].value;
     var sig_elements = elem.getElementsByClassName('signature');
     signatures[inputs[0].value] = [];
-    for (var sig of sig_elements){
-      signatures[inputs[0].value].push({
-        signer: sig.dataset.signer,
-        signature: sig.dataset.signature
-      });
-    }
+    for (var sig of sig_elements)
+      if(inputs[0].value == sig.dataset.key &&
+        inputs[1].value == sig.dataset.value)
+          signatures[inputs[0].value].push({
+            signer: sig.dataset.signer,
+            signature: sig.dataset.signature
+          });
   }
   return {
-    attributes: attributes, 
+    attributes: attributes,
     signatures: signatures
   };
 }
-
-function addAttributeIDElem(name, value, signer, signature) {
-  var ipfsattributes = elem('ipfs-attributes');
-  ipfsattributes.innerHTML +=
-    '<div class="ipfs-attribute">' +
-      '<div><span class="ipfs-attribute-name">' + name + '</span>: ' +
-      '<span class="ipfs-attribute-value">' + value + '</span></div>' +
-      '<div>Signed by: <span class="ipfs-attribute-signer overflow-ellipsis">' + signer + '</span></div>' +
-      '<div class="ipfs-attribute-buttons" data-attribute="' + name + ':' + value + '">' +
-        '<button id="ipfs-attr-sign" class="mini ui basic grey button">Sign</button>' +
-        '<button id="ipfs-attr-verify" class="mini ui basic grey button" data-signature="' + signature + '">Verify</button>' +
-        '<span class="unverified">Unverified</span>'
-      '</div>' +
-    '</div>';
-}
-
 
 /* CONTRACT FUNCTIONS */
 function setContract(contract_name, contract_address) {
@@ -710,7 +808,7 @@ function addContact(addr) {
   elem("contacts").innerHTML +=
     '<div class="card contact" data-uuid="' + addr + '">' +
       '<div class="content">' +
-        '<i class="right floated delete icon red" data-action="delete"></i>' +
+        '<i class="right floated delete icon red link" data-action="delete"></i>' +
         '<img class="left floated mini ui image" src="images/user.png" data-action="contact-card">' +
         '<div class="header">' + 'Contact' + '</div>' +
         '<div class="meta overflow-ellipsis">' + addr + '</div>' +
@@ -762,7 +860,7 @@ function resetUrl() {
 }
 
 function getQRFromJson(json) {
-  return '<img src="http://chart.apis.google.com/chart?cht=qr&chs=200x200&chl=' +
+  return '<img src="http://chart.apis.google.com/chart?cht=qr&chs=250x250&chl=' +
     encodeURIComponent(JSON.stringify(json)) + '">';
 }
 
@@ -870,6 +968,9 @@ window.addEventListener('load', function() {
   elem('setAttributes').addEventListener('click', function(event) {
     setAttributes();
   });
+  elem('send-request').addEventListener('click', function(event) {
+    showAttributeRequestPopup();
+  });
   elem('contacts').addEventListener('click', function(event) {
     var contact = event.target.parentElement.parentElement;
     if(event.target.dataset.action == 'delete')
@@ -917,14 +1018,45 @@ window.addEventListener('load', function() {
           attr.parentElement.removeChild(attr);
       }).catch(swal.noop);
   });
-  elem('ipfs-attributes').addEventListener('click', function(event) {
-    if(event.target.id == 'ipfs-attr-verify'){
-      var result = verifyAttribute(event.target.parentNode.dataset.attribute, event.target.dataset.signature);
-      setVerified(event.target.nextElementSibling, result);
+  elem('attributes').addEventListener('input', function(event) {
+    var container = event.target.parentElement.parentElement;
+    var signatures = container.getElementsByClassName('signature');
+    var inputs = container.getElementsByTagName('input');
+    for (var sig of signatures){
+      if(!container.dataset.allowchange &&
+        (inputs[0].value != sig.dataset.key || inputs[1].value != sig.dataset.value)){
+        swal({
+          title: 'Confirm Change',
+          type: 'info',
+          text: signatures.length + ' signature' + (signatures.length > 1 ? 's' : '') +
+          ' will be removed if the attribute is changed. Are you sure you want to continue?',
+          showCancelButton: true,
+          confirmButtonText: 'Confirm'
+        }).then(function() {
+          container.dataset.allowchange = true;
+          container.getElementsByClassName('signatures')[0].innerHTML = '';
+          container.parentElement.getElementsByClassName('num-attestations')[0].textContent = 0;
+          container.parentElement.getElementsByTagName('button')[0].disabled = true;
+        }, function(dismiss) {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+      }
     }
   });
   document.addEventListener('click', function(event) {
     if(event.target.dataset.action === 'recover-account')
       showRecoveryPopup();
+    else if (event.target.dataset.action === 'add-request'){
+      var attribute = document.createElement('div');
+      attribute.className = 'inline field';
+      attribute.innerHTML ='<input type="text" class="attribute" placeholder="Attribute" />' +
+        '<i class="right floated delete icon red link" data-action="delete-attr-request"></i>';
+      elem('attribute-requests').appendChild(attribute);
+    }
+    else if (event.target.dataset.action === 'delete-attr-request'){
+      var element = event.target.parentElement;
+      element.parentElement.removeChild(element);
+    }
   });
 });

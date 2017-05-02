@@ -10,7 +10,7 @@
 <body>
   <div class="ui segment">
     <div class="ui container">
-      <a id="scanner"><button class="ui right floated button">Open Scanner</button></a>
+      <a id="scanner" class="ui right floated button">Open Scanner</a>
       <h1>Identity</h1>
       <div id="menu" class="ui four item tabs menu">
         <a class="active item" data-tab="profile-tab">Profile</a>
@@ -32,13 +32,13 @@
           Recovery: <span id="recovery"> (none)</span><br />
           IPFS Hash: <span id="ipfshash"> (none)</span><br />
         </h4>
-        <div id="ipfs-attributes">(no data)</div>
+        <a id="send-request" class="ui button"><i class="icon send outline"></i> Send Request</a>
       </div>
     </div>
   </div>
   <div id="attributes-tab" class="ui tab">
     <div class="ui main container">
-      <h2>Attributes <button id="addAttributeFormRow" class="mini ui positive basic button">Add Attribute</button></h2>
+      <h2>Attributes <a id="addAttributeFormRow" class="ui positive mini basic button right floated">Add Attribute</a></h2>
       <div id="attributes" class="ui four cards stackable form"></div>
       <br />
       <button id="setAttributes" class="ui primary button">Save Attributes</button>
