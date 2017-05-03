@@ -23,7 +23,7 @@ const ipfs = ipfsapi(window.location.hostname, '5002');
 // Global settings
 const NUM_ACCOUNTS = 100;
 const PROVIDER = 'http://' + window.location.hostname + ':8545';
-const DEFAULT_MNEMONIC = "mixed aisle dry space raven engine rule include shuffle mouse parade stereo";
+const DEFAULT_MNEMONIC = "weird decrease razor must host category peace cheese volcano husband minute wife";
 
 // Contract variables
 var uuid;
@@ -71,12 +71,13 @@ function showIdentity(result, callback) {
     elem('recovery').innerHTML = result[2];
     elem('attributes').innerHTML = '';
     // Update attributes section
-    if(result[1])
-      getAttributes(result[1], callback);
     // Update recovery contacts
     if(result[2]){
       setContract('Recovery', result[2]);
-      getRecoveryContacts();
+      getRecoveryContacts(function() {
+        if(result[1])
+          getAttributes(result[1], callback);
+      });
     }
     if(address == result[0])
       elem('details').style.display = 'block';
@@ -98,13 +99,14 @@ function setIPFSHash(hash) {
 
 
 /* RECOVERY FUNCTIONS */
-function getRecoveryContacts() {
+function getRecoveryContacts(callback) {
   contracts.recovery.getContacts.call({from: address}, function(err, result) {
     if(!hasError(err) && result){
       elem("contacts").innerHTML = '';
       for (var addr of result)
         addContact(addr)
     }
+    if(callback) callback();
   });
 }
 

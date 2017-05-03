@@ -26,7 +26,8 @@ contract Recovery {
         _contacts = contacts;
     }
     function addRecovery(address _key) onlyContact {
-        if(recoveries[msg.sender] != _key && proposed_keys[recoveries[msg.sender]] == 0){
+        if(recoveries[msg.sender] != _key 
+            && proposed_keys[recoveries[msg.sender]] == 0){
             recoveries[msg.sender] = _key;
             proposed_keys[_key] += 1;
         }
@@ -36,7 +37,8 @@ contract Recovery {
             identity_c.transferOwner(_key);
         }
     }
-    function getRecoveries(address _key) returns (uint num_done, uint num_total) {
+    function getRecoveries(address _key) 
+            returns (uint num_done, uint num_total) {
         num_done = proposed_keys[_key];
         num_total = contacts.length / 2;
     }
@@ -77,7 +79,8 @@ contract Identity {
     function transferOwner(address _owner) onlyOwnerOrRecovery {
         owner = _owner;
     }
-    function getDetails() returns (address _owner, string _ipfs_hash, address _recovery) {
+    function getDetails() returns 
+            (address _owner, string _ipfs_hash, address _recovery) {
         _owner = owner;
         _ipfs_hash = ipfs_hash;
         _recovery = recovery;
