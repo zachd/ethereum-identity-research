@@ -18,7 +18,8 @@
     "web3-provider-engine": "^9.1.0"
   },
   "devDependencies": {
-    "babel-loader": "^6.3.2",
+    "babel-core": "^6.24.1",
+    "babel-loader": "^6.4.1",
     "copy-webpack-plugin": "^4.0.1",
     "css-loader": "^0.26.2",
     "extract-text-webpack-plugin": "^2.0.0",
